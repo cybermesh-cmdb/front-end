@@ -1,0 +1,577 @@
+﻿
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CMDB</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;700;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <h1 class="sr-only">CMDB</h1>
+
+  <div class="app">
+    <header class="topbar">
+      <div class="topbar-left">
+        <div class="brand-line">
+          <span class="brand-mark" aria-hidden="true">CMDB</span>
+          <div>
+            <div class="logo">CyberMesh</div>
+          </div>
+        </div>
+            </div>
+
+      <section class="api-config">
+        <div class="api-config-row">
+          <span class="keycloak-notice">Status da autenticação: Em implantação</span>
+        </div>
+      </section>
+    </header>
+
+    <nav class="nav" aria-label="Seções do CMDB">
+      <button class="nav-btn active" type="button" data-section="dashboard">Dashboard</button>
+      <button class="nav-btn" type="button" data-section="lec-logs">Agentless</button>
+      <button class="nav-btn" type="button" data-section="consulta">Consultar</button>
+      <button class="nav-btn" type="button" data-section="tenants">Tenants</button>
+      <button class="nav-btn" type="button" data-section="contatos">Contatos</button>
+      <button class="nav-btn" type="button" data-section="cadastro">Novo CI</button>
+    </nav>
+
+    <main class="content">
+      <section class="section active" id="sec-dashboard" aria-labelledby="dashboard-title">
+        <div class="page-title">
+          <div>
+            <h2 id="dashboard-title">Visão geral da CMDB</h2>
+            <p>Painel executivo com saúde da base, distribuição operacional e leitura rápida de criticidade dos ativos cadastrados.</p>
+          </div>
+          <span class="status-summary" id="dashboardStatus">Aguardando dados da API</span>
+        </div>
+
+        <div class="stats-grid">
+          <article class="stat">
+            <div class="stat-label">Total de ativos</div>
+            <div class="stat-value" id="dash-total-assets">-</div>
+            <div class="stat-note">Base completa de itens de configuração catalogados.</div>
+          </article>
+          <article class="stat">
+            <div class="stat-label">Ativos em operação</div>
+            <div class="stat-value" id="dash-active-assets">-</div>
+            <div class="stat-note">Itens com status ativo no ambiente operacional.</div>
+          </article>
+          <article class="stat">
+            <div class="stat-label">Exigem atenção</div>
+            <div class="stat-value" id="dash-attention-assets">-</div>
+            <div class="stat-note">Disconnected, Pending ou Never connected.</div>
+          </article>
+          <article class="stat">
+            <div class="stat-label">Número de LECs</div>
+            <div class="stat-value" id="dash-lec-assets">-</div>
+            <div class="stat-note">Quantidade de ativos marcados como LEC.</div>
+          </article>
+        </div>
+
+        <section class="card" aria-labelledby="dash-situation-title">
+          <div class="card-header">
+            <div>
+              <div class="card-title" id="dash-situation-title">Situação da CMDB</div>
+                <div class="card-subtitle">Agentes precisando de atenção</div>
+            </div>
+          </div>
+
+          <div class="dashboard-grid">
+            <section id="dashboardTenantsSection">
+              Cards de tenants serão renderizados aqui dinamicamente
+            </section>
+          </div>
+        </section>
+
+        <section class="card dashboard-card" aria-labelledby="dash-quality-title">
+            <div class="card-header">
+              <div>
+                <div class="card-title" id="dash-quality-title">Confiabilidade da CMDB</div>
+                <div class="card-subtitle">Mostra se os dados mínimos para gestão, risco e operação estão completos.</div>
+              </div>
+            </div>
+            <div class="quality-summary">
+              <div class="quality-score-card">
+                <div class="quality-score-label">Índice de confiabilidade</div>
+                <div class="quality-score-value" id="dashboardQualityScore">0%</div>
+                <div class="quality-score-status" id="dashboardQualityStatus">Sem dados</div>
+                <div class="quality-score-bar"><span id="dashboardQualityBar"></span></div>
+                <div class="quality-score-note" id="dashboardQualityNote">Preencha os campos críticos para aumentar a confiabilidade da base.</div>
+              </div>
+              <div class="insight-grid" id="dashboardQualityInsights"></div>
+            </div>
+        </section>
+
+        <section class="card dashboard-card" aria-labelledby="dash-criticality-title">
+          <div class="card-header">
+            <div>
+              <div class="card-title" id="dash-criticality-title">Faixas de criticidade</div>
+              <div class="card-subtitle">Leitura consolidada por níveis de impacto da operação.</div>
+            </div>
+          </div>
+          <div class="criticality-band-grid" id="dashboardCriticalityBands"></div>
+        </section>
+
+        <section class="card" aria-labelledby="recent-title">
+          <div class="card-header">
+            <div>
+              <div class="card-title" id="recent-title">Últimos ativos cadastrados</div>
+              <div class="card-subtitle">Os registros mais recentes para leitura operacional e conferência rápida.</div>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="dash-table">
+              <thead>
+                <tr>
+                  <th style="width:24%">Nome</th>
+                  <th style="width:16%">Tipo</th>
+                  <th style="width:16%">Criticidade</th>
+                  <th style="width:16%">IP / Host</th>
+                  <th style="width:12%">Status</th>
+                  <th style="width:16%">Atualizado em</th>
+                </tr>
+              </thead>
+              <tbody id="dash-recent">
+                <tr><td colspan="6" class="empty">Carregando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
+      <section class="section" id="sec-tenants" aria-labelledby="tenants-title">
+        <div class="page-title">
+          <div>
+            <h2 id="tenants-title">Tenants</h2>
+            <p>Cadastre e visualize os tenants. Cada tenant agrupa contatos e ativos de uma organização.</p>
+          </div>
+          <button class="btn primary" type="button" id="openTenantModalBtn">+ Novo Tenant</button>
+        </div>
+
+        <section class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Tenants cadastrados</div>
+              <div class="card-subtitle">Lista de todos os tenants disponíveis no sistema.</div>
+            </div>
+            <button class="btn" type="button" id="refreshTenantsListBtn">Atualizar</button>
+          </div>
+          <div class="table-wrap">
+            <table class="dash-table">
+              <thead>
+                <tr>
+                  <th style="width:30%">Nome</th>
+                  <th style="width:28%">Domain</th>
+                  <th style="width:22%">Cadastrado em</th>
+                  <th style="width:20%">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="tenants-table">
+                <tr><td colspan="4" class="empty">Carregando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
+      <section class="section" id="sec-contatos" aria-labelledby="contatos-title">
+        <div class="page-title">
+          <div>
+            <h2 id="contatos-title">Contatos por Tenant</h2>
+            <p>Gerencie os contatos vinculados a cada tenant. Selecione um tenant para ver ou adicionar contatos.</p>
+          </div>
+        </div>
+
+        <section class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title" id="contact-form-title">Cadastrar contato</div>
+              <div class="card-subtitle">Cada contato precisa estar vinculado a um tenant existente.</div>
+            </div>
+          </div>
+          <div class="form-grid">
+            <div class="form-group"><label class="form-label" for="contact-tenant">Tenant *</label><select id="contact-tenant"><option value="">Selecione um tenant</option></select></div>
+            <div class="form-group"><label class="form-label" for="contact-type">Tipo de contato *</label><select id="contact-type"><option value="">Selecione um tipo</option></select></div>
+            <div class="form-group"><label class="form-label" for="contact-name">Nome do contato *</label><input id="contact-name" placeholder="Ex: Maria Silva" /></div>
+            <div class="form-group"><label class="form-label" for="contact-mail">Email *</label><input id="contact-mail" placeholder="contato@empresa.com" /></div>
+            <div class="form-group"><label class="form-label" for="contact-phone">Telefone</label><input id="contact-phone" placeholder="+55 11 99999-9999" /></div>
+            <div class="form-group"><label class="form-label" for="contact-priority">Prioridade</label><input id="contact-priority" type="number" min="1" max="10" value="1" /></div>
+            <div class="form-group"><label class="form-label" for="contact-channel">Canal de notificação</label><input id="contact-channel" placeholder="Email, SMS, Teams..." /></div>
+          </div>
+          <div class="form-actions">
+            <button class="btn" type="button" id="loadContactsBtn">Ver contatos do tenant</button>
+            <button class="btn primary" type="button" id="saveTenantContactBtn">Salvar contato</button>
+            <button class="btn" type="button" id="cancelContactEditBtn" hidden>Cancelar edição</button>
+          </div>
+        </section>
+
+        <section class="card" style="margin-top:16px">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Contatos cadastrados</div>
+              <div class="card-subtitle">Lista de contatos do tenant selecionado acima.</div>
+            </div>
+          </div>
+
+          <div class="search-bar" aria-label="Filtros de contatos">
+            <div class="search-grow">
+              <label class="sr-only" for="searchContact">Buscar contato</label>
+              <input id="searchContact" type="text" placeholder="Pesquisar por nome ou email" autocomplete="off" />
+            </div>
+            <div class="search-actions">
+              <button class="btn" id="clearContactFilterBtn" type="button">Limpar filtro</button>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table class="dash-table">
+              <thead>
+                <tr>
+                  <th>Nome</th>
+                  <th>Email</th>
+                  <th>Telefone</th>
+                  <th>Tipo</th>
+                  <th>Prioridade</th>
+                  <th style="width:18%">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="tenant-contacts-table">
+                <tr><td colspan="6" class="empty">Selecione um tenant para visualizar os contatos.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="pagination-bar" aria-label="Paginação dos contatos">
+            <div class="pagination-info" id="contactPaginationInfo">Exibindo 0 de 0 contatos</div>
+            <div class="pagination-controls">
+              <label for="contactPageSizeSelect">Itens por página</label>
+              <select id="contactPageSizeSelect">
+                <option value="5">5</option>
+                <option value="10" selected>10</option>
+                <option value="20">20</option>
+                <option value="50">50</option>
+              </select>
+              <button class="btn" type="button" id="contactPrevPageBtn">Anterior</button>
+              <span class="pagination-info" id="contactPageNumberInfo">Página 1 de 1</span>
+              <button class="btn" type="button" id="contactNextPageBtn">Próxima</button>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <section class="section" id="sec-consulta" aria-labelledby="consulta-title">
+        <div class="page-title">
+          <div>
+            <h2 id="consulta-title">Consultar itens de configuração</h2>
+            <p>Pesquise pelos ativos usando tenant, nome, status e criticidade.</p>
+          </div>
+        </div>
+
+        <div class="search-bar" aria-label="Filtros de consulta">
+          <div class="search-select">
+            <label class="sr-only" for="filterTenant">Filtrar por tenant</label>
+            <select id="filterTenant">
+              <option value="">Todos os tenants</option>
+            </select>
+          </div>
+          <div class="search-combo" aria-label="Busca por campo">
+            <div class="search-grow">
+              <label class="sr-only" for="searchQ">Buscar ativo</label>
+              <input id="searchQ" type="text" placeholder="Pesquisar ativo" autocomplete="off" />
+            </div>
+            <div class="search-select">
+              <label class="sr-only" for="searchField">Campo da busca</label>
+              <select id="searchField">
+                <option value="name">Nome</option>
+                <option value="ip">IP</option>
+                <option value="hostname">Hostname</option>
+                <option value="product">Produto</option>
+                <option value="id_external">ID</option>
+              </select>
+            </div>
+          </div>
+          <div class="search-select">
+            <label class="sr-only" for="filterStatus">Filtrar por status</label>
+            <select id="filterStatus">
+              <option value="">Todos os status</option>
+              <option value="active">Active</option>
+              <option value="disconnected">Disconnected</option>
+              <option value="pending">Pending</option>
+              <option value="never_connected">Never connected</option>
+            </select>
+          </div>
+          <div class="search-select">
+            <label class="sr-only" for="filterCriticality">Filtrar por criticidade</label>
+            <select id="filterCriticality">
+              <option value="">Todas as criticidades</option>
+            </select>
+          </div>
+          <div class="search-select">
+            <label class="sr-only" for="filterLec">Filtrar por LEC</label>
+            <select id="filterLec">
+              <option value="">Todos com e sem LEC</option>
+              <option value="1">LEC</option>
+              <option value="0">Sem LEC</option>
+            </select>
+          </div>
+          <div class="search-actions">
+            <button class="btn" id="reloadCisBtn" type="button">Atualizar lista</button>
+            <button class="btn" id="clearFiltersBtn" type="button">Limpar filtros</button>
+          </div>
+        </div>
+
+        <section class="card" style="padding: 0" aria-labelledby="ci-table-title">
+          <h3 class="sr-only" id="ci-table-title">Tabela de itens de configuração</h3>
+          <div class="table-wrap">
+            <table class="ci-table-view">
+              <thead id="ci-table-head">
+                <tr>
+                  <th style="width:15%" data-sort-key="name" class="ci-sortable" aria-sort="none">Nome <span class="ci-sort-indicator" aria-hidden="true"></span></th>
+                  <th style="width:8%" data-sort-key="idExternal" class="ci-sortable" aria-sort="none">ID <span class="ci-sort-indicator" aria-hidden="true"></span></th>
+                  <th style="width:12%" data-sort-key="type" class="ci-sortable" aria-sort="none">Tipo <span class="ci-sort-indicator" aria-hidden="true"></span></th>
+                  <th style="width:12%" data-sort-key="criticality" class="ci-sortable" aria-sort="none">Criticidade <span class="ci-sort-indicator" aria-hidden="true"></span></th>
+                  <th style="width:14%" data-sort-key="ipHost" class="ci-sortable" aria-sort="none">IP / Host <span class="ci-sort-indicator" aria-hidden="true"></span></th>
+                  <th style="width:11%" data-sort-key="status" class="ci-sortable" aria-sort="none">Status <span class="ci-sort-indicator" aria-hidden="true"></span></th>
+                  <th style="width:14%" data-sort-key="product" class="ci-sortable" aria-sort="none">Produto <span class="ci-sort-indicator" aria-hidden="true"></span></th>
+                  <th style="width:14%">Acoes</th>
+                </tr>
+              </thead>
+              <tbody id="ci-table">
+                <tr class="empty-row"><td colspan="7" class="empty">Carregando dados da API...</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="pagination-bar" aria-label="Controles de paginação">
+            <div class="pagination-info" id="paginationInfo">Exibindo 0 de 0</div>
+            <div class="pagination-controls">
+              <label for="pageSizeSelect">Itens por página</label>
+              <select id="pageSizeSelect">
+                <option value="5">5</option>
+                <option value="10" selected>10</option>
+                <option value="20">20</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+                <option value="200">200</option>
+              </select>
+              <button class="btn" type="button" id="prevPageBtn">Anterior</button>
+              <span class="pagination-info" id="pageNumberInfo">Página 1 de 1</span>
+              <div class="pagination-pages" id="pageNumberButtons" aria-label="Números das páginas"></div>
+              <button class="btn" type="button" id="nextPageBtn">Próxima</button>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <section class="section" id="sec-lec-logs" aria-labelledby="lec-logs-title">
+        <div class="page-title">
+          <div>
+            <h2 id="lec-logs-title">Agentless</h2>
+            <p>Visualize o status dos Agentless com informações sobre tenant, device, últimos eventos e status.</p>
+          </div>
+          <button class="btn" type="button" id="refreshLecLogsBtn">Atualizar</button>
+        </div>
+
+        <div class="lec-kpis-grid" aria-label="KPIs de Agentless">
+          <article class="lec-kpi-card">
+            <div class="lec-kpi-label">Dispositivos monitorados</div>
+            <div class="lec-kpi-value" id="lecKpiTotalDevices">0</div>
+            <div class="lec-kpi-note">Registros visíveis após os filtros atuais.</div>
+          </article>
+          <article class="lec-kpi-card success">
+            <div class="lec-kpi-label">Dispositivos saudáveis</div>
+            <div class="lec-kpi-value" id="lecKpiHealthyDevices">0</div>
+            <div class="lec-kpi-note">Status online, active ou ativo.</div>
+          </article>
+          <article class="lec-kpi-card warning">
+            <div class="lec-kpi-label">Em atenção</div>
+            <div class="lec-kpi-value" id="lecKpiAttentionDevices">0</div>
+            <div class="lec-kpi-note">Offline, disconnected, pending ou inativo.</div>
+          </article>
+          <article class="lec-kpi-card muted">
+            <div class="lec-kpi-label">Sem nome de device</div>
+            <div class="lec-kpi-value" id="lecKpiUnnamedDevices">0</div>
+            <div class="lec-kpi-note">Itens sem identificação clara no cadastro.</div>
+          </article>
+        </div>
+
+        <section class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Agentless Cadastrados</div>
+              <div class="card-subtitle">Monitoramento em tempo real dos Agentless com status e últimas atualizações.</div>
+            </div>
+          </div>
+          <div id="lec-logs-container" class="lec-logs-grid">
+            <div class="empty-state">
+              <div style="text-align: center; padding: 40px;">Carregando dados...</div>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <section class="section" id="sec-cadastro" aria-labelledby="cadastro-title">
+        <div class="page-title">
+          <div>
+            <h2 id="cadastro-title">Cadastrar novo ativo</h2>
+            <p>Fluxo separado: cadastre o tenant, depois contatos por tenant, e por fim os ativos vinculados ao tenant.</p>
+          </div>
+        </div>
+
+        <section class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Informações do ativo</div>
+              <div class="card-subtitle">Campos principais gravados em cmdb_assets com relacionamento aos catálogos.</div>
+            </div>
+          </div>
+          <div class="form-grid">
+                        <div class="form-group"><label class="form-label" for="asset-tenant">Tenant *</label><select id="asset-tenant"><option value="">Selecione um tenant</option></select></div>
+            <div class="form-group"><label class="form-label" for="asset-external-id">ID</label><input id="asset-external-id" placeholder="001" maxlength="10" /></div>
+
+            <div class="form-group"><label class="form-label" for="asset-name">Nome *</label><input id="asset-name" required placeholder="AUCS0127" /></div>
+            <div class="form-group"><label class="form-label" for="asset-type">Tipo *</label><select id="asset-type"><option value="">Carregando tipos...</option></select></div>
+            <div class="form-group"><label class="form-label" for="asset-criticality">Criticidade *</label><select id="asset-criticality"><option value="">Carregando criticidades...</option></select></div>
+            <div class="form-group">
+              <label class="form-label" for="asset-vendor-search">Product Vendor</label>
+              <input id="asset-vendor-search" list="asset-vendor-list" placeholder="Buscar vendor" autocomplete="off" />
+              <datalist id="asset-vendor-list"></datalist>
+            </div>
+            <div class="form-group"><label class="form-label" for="asset-model">Product Name / Plataforma</label><input id="asset-model" list="asset-model-list" placeholder="Microsoft Windows Server 2025 Standard" /></div>
+            <datalist id="asset-model-list"></datalist>
+            <div class="form-group"><label class="form-label" for="asset-hostname">Hostname ou FQDN</label><input id="asset-hostname" placeholder="AUCS0127" /></div>
+            <div class="form-group"><label class="form-label" for="asset-ip">IP principal</label><input id="asset-ip" placeholder="192.168.1.10" /></div>
+            <div class="form-group"><label class="form-label" for="asset-version">Versao do sistema</label><input id="asset-version" placeholder="Windows" /></div>
+            <div class="form-group"><label class="form-label" for="asset-mac">MAC Address</label><input id="asset-mac" placeholder="00:50:56:82:89:8f" /></div>
+            <div class="form-group"><label class="form-label" for="asset-status">Status</label><select id="asset-status"><option value="active">Active</option><option value="disconnected">Disconnected</option><option value="pending">Pending</option><option value="never_connected">Never connected</option></select></div>
+            
+            <div class="form-group"><label class="form-label" for="asset-lec">LEC</label><select id="asset-lec"><option value="0">Não</option><option value="1">Sim</option></select></div>
+
+            <div class="form-group" style="grid-column: 1 / -1"><label class="form-label" for="asset-observations">Observações</label><textarea id="asset-observations" placeholder="Notas adicionais sobre o ativo..." rows="3"></textarea></div>
+          </div>
+          <div class="form-actions"><button class="btn" type="button" id="clearAssetBtn">Limpar</button><button class="btn primary" type="button" id="saveAssetBtn">Salvar ativo</button></div>
+        </section>
+
+        <section class="card" style="margin-top:16px">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Tags (Opcional)</div>
+              <div class="card-subtitle">Adicione tags para categorizar este ativo. Clique em "+" para adicionar mais.</div>
+            </div>
+          </div>
+          <div id="tags-container" class="tags-form-container"></div>
+          <div class="form-actions">
+            <button class="btn" type="button" id="addTagFieldBtn">+ Adicionar Tag</button>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <div class="detail-modal" id="tenantModal" aria-hidden="true">
+      <div class="detail-box" role="dialog" aria-modal="true" aria-labelledby="tenant-modal-title" style="max-width:480px">
+        <div class="detail-header">
+          <div>
+            <div class="card-title" id="tenant-modal-title">Novo Tenant</div>
+            <div class="card-subtitle" id="tenant-modal-subtitle">Cadastro mestre para organizacao dos demais registros.</div>
+          </div>
+          <button class="btn" id="closeTenantModalBtn" type="button">Fechar</button>
+        </div>
+        <div style="padding:16px 0">
+          <div class="form-group">
+            <label class="form-label" for="tenant-name">Nome do tenant *</label>
+            <input id="tenant-name" placeholder="Ex: Blau" autocomplete="off" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="tenant-domain">Domain</label>
+            <input id="tenant-domain" placeholder="Ex: blau.com.br" autocomplete="off" />
+          </div>
+        </div>
+        <div class="form-actions" style="justify-content:flex-end">
+          <button class="btn" type="button" id="cancelTenantModalBtn">Cancelar</button>
+          <button class="btn primary" type="button" id="saveTenantBtn">Salvar tenant</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="detail-modal" id="detailModal" aria-hidden="true">
+      <div class="detail-box" role="dialog" aria-modal="true" aria-labelledby="detail-title">
+        <div class="detail-header">
+          <div>
+            <div class="detail-tenant-header" id="detail-tenant-header" hidden>
+              <span class="detail-tenant-label">Tenant</span>
+              <span class="detail-tenant-value" id="detail-tenant-value">-</span>
+            </div>
+            <div class="card-title" id="detail-title">Detalhes do CI</div>
+            
+          </div>
+          <button class="btn" id="closeDetailBtn" type="button">Fechar</button>
+        </div>
+        <div class="detail-grid" id="detail-content"></div>
+        <div class="modal-actions-row">
+          <button class="btn" id="detailEditBtn" type="button">Editar ativo</button>
+          <button class="btn primary" id="detailSaveBtn" type="button" hidden>Salvar alterações</button>
+          <button class="btn" id="detailCancelBtn" type="button" hidden>Cancelar edição</button>
+        </div>
+
+        <div class="tags-section">
+          <div class="tags-section-header">
+            <div class="card-title">Tags do ativo</div>
+          </div>
+          <div id="detail-tags-list" class="tags-list"><span class="tags-empty">Carregando tags...</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="detail-modal" id="contactDetailModal" aria-hidden="true">
+      <div class="detail-box" role="dialog" aria-modal="true" aria-labelledby="contact-detail-title" style="max-width:680px">
+        <div class="detail-header">
+          <div>
+            <div class="card-title" id="contact-detail-title">Detalhes do contato</div>
+            <div class="card-subtitle">Visualize, edite ou remova o contato selecionado.</div>
+          </div>
+          <button class="btn" id="closeContactDetailBtn" type="button">Fechar</button>
+        </div>
+        <div class="detail-grid" id="contact-detail-content"></div>
+        <div class="modal-actions-row">
+          <button class="btn" id="contactDetailEditBtn" type="button">Editar contato</button>
+          <button class="btn danger" id="contactDetailDeleteBtn" type="button">Deletar contato</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="detail-modal" id="confirmModal" aria-hidden="true">
+      <div class="detail-box confirm-box" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title" style="max-width:560px">
+        <div class="detail-header">
+          <div>
+            <div class="card-title" id="confirm-modal-title">Confirmar exclusão</div>
+            <div class="card-subtitle">Essa ação exige confirmação explícita.</div>
+          </div>
+          <button class="btn" id="closeConfirmModalBtn" type="button">Fechar</button>
+        </div>
+        <div class="confirm-body">
+          <div class="confirm-icon" aria-hidden="true">!</div>
+          <div>
+            <div class="confirm-message" id="confirm-modal-message">Tem certeza que deseja continuar?</div>
+            <div class="confirm-note">A operação será aplicada imediatamente e não poderá ser desfeita.</div>
+          </div>
+        </div>
+        <div class="modal-actions-row">
+          <button class="btn" id="cancelConfirmModalBtn" type="button">Cancelar</button>
+          <button class="btn danger" id="confirmModalActionBtn" type="button">Excluir</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>
+
+
+
