@@ -5,7 +5,7 @@ const DEFAULT_API_BASE = (() => {
   // Se não estiver em localhost/127.0.0.1, usa path relativo (produção via Nginx)
   const host = window.location.hostname;
   if (host === 'localhost' || host === '127.0.0.1') {
-    return `${window.location.protocol}//${host}:3000/api`;
+    return `${window.location.protocol}//${host}:3001/api`;
   }
   return '/api';
 })();

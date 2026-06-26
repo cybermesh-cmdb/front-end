@@ -4,7 +4,7 @@
   "private": true,
   "description": "Frontend estatico do CMDB CyberMesh",
   "scripts": {
-    "start": "http-server . -p 8080 -c-1"
+    "start": "http-server . -p 7443 -c-1"
   },
   "devDependencies": {
     "http-server": "^14.1.1"
