@@ -150,10 +150,16 @@ const DEFAULT_API_BASE = (() => {
       const map = {
         ativo: 'active',
         active: 'active',
+        online: 'active',
+        ok: 'active',
         inativo: 'disconnected',
         inactive: 'disconnected',
         desconectado: 'disconnected',
         disconnected: 'disconnected',
+        offline: 'disconnected',
+        fora: 'disconnected',
+        problem: 'disconnected',
+        problema: 'disconnected',
         manutencao: 'pending',
         maintenance: 'pending',
         planejado: 'pending',
@@ -2001,7 +2007,7 @@ const DEFAULT_API_BASE = (() => {
         const response = await request('/lec-logs');
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         lecLogsList = await response.json();
-        lecLogsFilteredList = lecLogsList;
+        lecLogsFilteredList = lecLogsList.filter(isLecAttentionLog);
         renderLecLogsKpis();
         renderLecLogsTable();
       } catch (error) {
@@ -2019,27 +2025,29 @@ const DEFAULT_API_BASE = (() => {
       }
     }
 
+    function isLecAttentionLog(log) {
+      const status = normalizeStatusValue(log?.status_lec);
+      return ['disconnected', 'pending', 'never_connected'].includes(status);
+    }
+
     function renderLecLogsKpis() {
-      const totalDevices = lecLogsFilteredList.length;
-      const healthyDevices = lecLogsFilteredList.filter((log) => {
-        const status = String(log.status_lec || '').toLowerCase();
-        return ['active', 'online', 'ativo'].includes(status);
+      const totalDevices = lecLogsList.length;
+      const healthyDevices = lecLogsList.filter((log) => {
+        const status = normalizeStatusValue(log?.status_lec);
+        return status === 'active';
       }).length;
-      const attentionDevices = lecLogsFilteredList.filter((log) => {
-        const status = String(log.status_lec || '').toLowerCase();
-        return ['disconnected', 'offline', 'pending', 'inactive', 'inativo', 'never_connected'].includes(status);
-      }).length;
-      const unnamedDevices = lecLogsFilteredList.filter((log) => !String(log.device_name || '').trim()).length;
+      const attentionDevices = lecLogsFilteredList.length;
+      const noEventDevices = lecLogsFilteredList.filter((log) => !log.last_event).length;
 
       const totalNode = document.getElementById('lecKpiTotalDevices');
       const healthyNode = document.getElementById('lecKpiHealthyDevices');
       const attentionNode = document.getElementById('lecKpiAttentionDevices');
-      const unnamedNode = document.getElementById('lecKpiUnnamedDevices');
+      const noEventNode = document.getElementById('lecKpiNoEventDevices');
 
       if (totalNode) totalNode.textContent = String(totalDevices);
       if (healthyNode) healthyNode.textContent = String(healthyDevices);
       if (attentionNode) attentionNode.textContent = String(attentionDevices);
-      if (unnamedNode) unnamedNode.textContent = String(unnamedDevices);
+      if (noEventNode) noEventNode.textContent = String(noEventDevices);
     }
 
     function renderLecLogsTable() {
@@ -2048,8 +2056,8 @@ const DEFAULT_API_BASE = (() => {
         container.innerHTML = `
           <div class="empty-state">
             <div style="text-align: center; padding: 40px;">
-              <div style="font-size: 18px; font-weight: 500; margin-bottom: 8px;">Nenhum LEC Log encontrado</div>
-              <div style="color: #999;">Verifique os filtros ou carregue novos dados.</div>
+              <div style="font-size: 18px; font-weight: 500; margin-bottom: 8px;">Nenhum dispositivo em atenção</div>
+              <div style="color: #999;">Todos os agentless estão saudáveis no momento.</div>
             </div>
           </div>`;
         return;
@@ -2058,7 +2066,8 @@ const DEFAULT_API_BASE = (() => {
       container.innerHTML = lecLogsFilteredList.map(log => {
         const status = log.status_lec || '-';
         const statusClass = getStatusClass(status);
-        const isHealthy = statusClass === 'status-active' || statusClass === 'status-online';
+        const deviceLabel = log.hostname_lec || log.device_name || 'Device desconhecido';
+        const tenantLabel = log.custom_name || log.customer_name || '-';
         const lastEvent = log.last_event ? new Date(log.last_event) : null;
         const lastEventFormatted = lastEvent ? formatDate(lastEvent) : 'Sem eventos';
         const hoursAgo = lastEvent ? Math.floor((Date.now() - lastEvent) / (1000 * 60 * 60)) : null;
@@ -2068,19 +2077,13 @@ const DEFAULT_API_BASE = (() => {
           <article class="lec-log-card ${statusClass}">
             <div class="lec-card-header">
               <div class="lec-card-status-indicator" title="Status: ${esc(status)}"></div>
-              <div class="lec-card-title">${esc(log.device_name || 'Device desconhecido')}</div>
-              <div class="lec-card-badge">${statusPill(status)}</div>
+              <div class="lec-card-title">${esc(deviceLabel)}</div>
             </div>
             
             <div class="lec-card-body">
               <div class="lec-info-row">
                 <span class="lec-label">Tenant</span>
-                <span class="lec-value">${esc(log.customer_name || '-')}</span>
-              </div>
-              
-              <div class="lec-info-row">
-                <span class="lec-label">IP do LEC</span>
-                <span class="lec-value mono">${esc(log.ip_lec || '-')}</span>
+                <span class="lec-value">${esc(tenantLabel)}</span>
               </div>
               
               <div class="lec-info-row">
@@ -2089,11 +2092,6 @@ const DEFAULT_API_BASE = (() => {
                   <span class="lec-value">${esc(lastEventFormatted)}</span>
                   <span class="lec-time-ago">${esc(timeAgo)}</span>
                 </div>
-              </div>
-              
-              <div class="lec-info-row">
-                <span class="lec-label">Threshold</span>
-                <span class="lec-value">${esc(log.threshold_minutes ? log.threshold_minutes + ' min' : '-')}</span>
               </div>
             </div>
             
@@ -2108,9 +2106,11 @@ const DEFAULT_API_BASE = (() => {
         'active': 'status-active',
         'online': 'status-active',
         'ativo': 'status-active',
+        'ok': 'status-active',
         'disconnected': 'status-disconnected',
         'offline': 'status-disconnected',
         'inativo': 'status-disconnected',
+        'fora': 'status-disconnected',
         'pending': 'status-pending',
         'pendente': 'status-pending',
         'never_connected': 'status-never-connected'
