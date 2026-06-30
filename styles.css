@@ -709,7 +709,7 @@
 
   .tenant-attention-values {
     display: flex;
-    gap: 12px;
+    gap: 5px;
     align-items: flex-start;
   }
 

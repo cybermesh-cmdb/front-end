@@ -2531,40 +2531,59 @@ const DEFAULT_API_BASE = (() => {
           </div>`;
         return;
       }
-      
-      container.innerHTML = lecLogsFilteredList.map(log => {
-        const status = log.status_lec || '-';
-        const statusClass = getStatusClass(status);
-        const deviceLabel = log.hostname_lec || log.device_name || 'Device desconhecido';
-        const tenantLabel = log.custom_name || log.customer_name || '-';
-        const lastEvent = log.last_event ? new Date(log.last_event) : null;
-        const lastEventFormatted = lastEvent ? formatDate(lastEvent) : 'Sem eventos';
-        const hoursAgo = lastEvent ? Math.floor((Date.now() - lastEvent) / (1000 * 60 * 60)) : null;
-        const timeAgo = hoursAgo !== null ? `${hoursAgo}h atrás` : '-';
-        
+
+      const groupedByTenant = new Map();
+      lecLogsFilteredList.forEach((log) => {
+        const tenantRaw = String(log.custom_name || log.customer_name || '').trim();
+        const tenantName = normalizeTenantDisplay(tenantRaw || 'Tenant não informado');
+        const tenantKey = normalizeTenantKey(tenantName) || 'tenant-nao-informado';
+        const deviceLabel = log.hostname_lec || log.device_name || log.ip_host || log.ip_lec || 'Dispositivo desconhecido';
+        const eventEpoch = toEpoch(log.last_event);
+
+        const current = groupedByTenant.get(tenantKey) || {
+          tenantName,
+          attentionCount: 0,
+          latestEventAt: null,
+          latestEventEpoch: 0,
+          latestDeviceLabel: '-'
+        };
+
+        current.attentionCount += 1;
+
+        if (eventEpoch >= current.latestEventEpoch) {
+          current.latestEventEpoch = eventEpoch;
+          current.latestEventAt = log.last_event || null;
+          current.latestDeviceLabel = deviceLabel;
+        }
+
+        groupedByTenant.set(tenantKey, current);
+      });
+
+      const tenantRows = [...groupedByTenant.values()].sort((left, right) => {
+        if (right.attentionCount !== left.attentionCount) {
+          return right.attentionCount - left.attentionCount;
+        }
+        return left.tenantName.localeCompare(right.tenantName, 'pt-BR');
+      });
+
+      container.innerHTML = tenantRows.map((row) => {
+        const latestEventLabel = row.latestEventAt ? formatDate(row.latestEventAt) : 'Sem eventos';
         return `
-          <article class="lec-log-card ${statusClass}">
-            <div class="lec-card-header">
-              <div class="lec-card-status-indicator" title="Status: ${esc(status)}"></div>
-              <div class="lec-card-title">${esc(deviceLabel)}</div>
-            </div>
-            
-            <div class="lec-card-body">
-              <div class="lec-info-row">
-                <span class="lec-label">Tenant</span>
-                <span class="lec-value">${esc(tenantLabel)}</span>
-              </div>
-              
-              <div class="lec-info-row">
-                <span class="lec-label">Último Evento</span>
-                <div class="lec-time-info">
-                  <span class="lec-value">${esc(lastEventFormatted)}</span>
-                  <span class="lec-time-ago">${esc(timeAgo)}</span>
+          <article class="card dashboard-card tenant-kpi-card has-attention">
+            <div class="tenant-kpi-header">
+              <div class="tenant-kpi-name">${esc(row.tenantName)}</div>
+              <div class="tenant-kpi-top-counts">
+                <div class="tenant-kpi-top-count">
+                  <div class="metric-label">Atenção</div>
+                  <div class="metric-value attention">${formatCompactNumber(row.attentionCount)}</div>
                 </div>
               </div>
             </div>
-            
-          
+
+            <div class="tenant-kpi-recent">
+              <span class="recent-asset">Último dispositivo: ${esc(row.latestDeviceLabel)}</span>
+              <span class="recent-time">${esc(latestEventLabel)}</span>
+            </div>
           </article>`;
       }).join('');
     }
