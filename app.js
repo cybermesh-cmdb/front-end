@@ -3426,7 +3426,10 @@ const DEFAULT_API_BASE = (() => {
         }
       });
 
-      document.getElementById('refreshLecLogsBtn').addEventListener('click', loadLecLogs);
+      const refreshLecLogsBtn = document.getElementById('refreshLecLogsBtn');
+      if (refreshLecLogsBtn) {
+        refreshLecLogsBtn.addEventListener('click', loadLecLogs);
+      }
 
       const refreshUnifiedDashboardBtn = document.getElementById('refreshUnifiedDashboardBtn');
       if (refreshUnifiedDashboardBtn) {
