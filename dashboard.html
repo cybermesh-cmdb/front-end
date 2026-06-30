@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard Geral - CMDB</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;700;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./styles.css?v=__BUILD_VERSION__" />
+</head>
+<body>
+  <h1 class="sr-only">Dashboard Geral CMDB</h1>
+
+  <div class="app">
+    <header class="topbar">
+      <div class="topbar-left">
+        <div class="brand-line">
+          <span class="brand-mark" aria-hidden="true">CMDB</span>
+          <div>
+            <div class="logo">CyberMesh</div>
+          </div>
+        </div>
+      </div>
+
+      <section class="api-config">
+        <div class="api-config-row">
+          <a class="btn" href="./index.html">Voltar para Agents/Agentless</a>
+        </div>
+      </section>
+    </header>
+
+    <main class="content">
+      <section class="section active" id="sec-overview" aria-labelledby="overview-title">
+        <div class="page-title">
+          <div>
+            <h2 id="overview-title">Dashboard</h2>
+            <p>Informações gerais sobre o estado dos dispositivos e tenants.</p>
+          </div>
+          <span class="status-summary" id="dashboardStatus">Aguardando atualização dos dados</span>
+        </div>
+
+
+        <div class="stats-grid" aria-label="KPIs gerais">
+          <article class="stat">
+            <div class="stat-label">Total de ativos</div>
+            <div class="stat-value" id="uni-total-assets">-</div>
+            <div class="stat-note">Total de ativos.</div>
+          </article>
+          <article class="stat">
+            <div class="stat-label">Ativos em operação</div>
+            <div class="stat-value" id="uni-active-assets">-</div>
+            <div class="stat-note">Dispositivos em operação.</div>
+          </article>
+          <article class="stat">
+            <div class="stat-label">Em atenção</div>
+            <div class="stat-value" id="uni-attention-assets">-</div>
+            <div class="stat-note">Status fora, pending, disconnected ou never connected.</div>
+          </article>
+          <article class="stat">
+            <div class="stat-label">Número de tenants ativos</div>
+            <div class="stat-value" id="uni-active-tenants">-</div>
+            <div class="stat-note">Total de tenants ativos.</div>
+          </article>
+        </div>
+
+        <section class="card" aria-labelledby="tenant-cards-title">
+          <div class="card-header">
+            <div>
+              <div class="card-title" id="tenant-cards-title">Situação dos dispositivos</div>
+              <div class="card-subtitle">Detalhes sobre a situação dos dispositivos por tenant.</div>
+            </div>
+          </div>
+          <div id="dashboardTenantsSection">
+            <article class="card dashboard-card">
+              <div class="card-header">
+                <div>
+                  <div class="card-title">KPIs por Tenant</div>
+                  <div class="card-subtitle">Carregando dados...</div>
+                </div>
+              </div>
+            </article>
+          </div>
+        </section>
+
+      </section>
+    </main>
+  </div>
+
+  <script src="./dashboard.js?v=__BUILD_VERSION__"></script>
+</body>
+</html>

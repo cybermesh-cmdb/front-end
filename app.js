@@ -59,6 +59,10 @@ const DEFAULT_API_BASE = (() => {
     let contactPageSize = 10;
     let lecLogsList = [];
     let lecLogsFilteredList = [];
+    let unifiedDashboardRows = [];
+    let unifiedDashboardFilteredRows = [];
+    let unifiedDashboardQuickFilter = 'all';
+    let consultaSource = 'agents';
     const REQUIRED_ASSET_FIELDS = ['asset-name', 'asset-type', 'asset-criticality', 'asset-tenant'];
 
     function v(id) {
@@ -114,6 +118,30 @@ const DEFAULT_API_BASE = (() => {
       }
     }
 
+    function openConsultaSourceModal() {
+      const modal = document.getElementById('consultaSourceModal');
+      if (!modal) {
+        setConsultaSource('agents', { reload: false });
+        showSection('consulta');
+        return;
+      }
+      modal.classList.add('show');
+      modal.setAttribute('aria-hidden', 'false');
+    }
+
+    function closeConsultaSourceModal() {
+      const modal = document.getElementById('consultaSourceModal');
+      if (!modal) return;
+      modal.classList.remove('show');
+      modal.setAttribute('aria-hidden', 'true');
+    }
+
+    function pickConsultaSource(source) {
+      setConsultaSource(source, { reload: false });
+      closeConsultaSourceModal();
+      showSection('consulta');
+    }
+
     function esc(value) {
       const div = document.createElement('div');
       div.textContent = String(value ?? '');
@@ -126,6 +154,21 @@ const DEFAULT_API_BASE = (() => {
         .replace(/[\u0300-\u036f]/g, '')
         .toLowerCase()
         .trim();
+    }
+
+    function stripTenantPrefix(value) {
+      return String(value || '').trim().replace(/^\d+\s*-\s*/i, '').trim();
+    }
+
+    function normalizeTenantKey(value) {
+      return normalizeText(stripTenantPrefix(value));
+    }
+
+    function normalizeTenantDisplay(value) {
+      const text = String(value || '').trim();
+      const match = text.match(/^(\d+)\s*-\s*(.+)$/);
+      if (!match) return text;
+      return `${match[1]}-${match[2].trim()}`;
     }
 
     const ALLOWED_DASHBOARD_TENANTS = new Set([
@@ -184,15 +227,229 @@ const DEFAULT_API_BASE = (() => {
       const searchInput = document.getElementById('searchQ');
       if (!searchInput) return;
 
-      const placeholderByField = {
-        name: 'Pesquisar pelo nome do ativo',
-        ip: 'Pesquisar pelo IP do ativo',
-        hostname: 'Pesquisar pelo hostname do ativo',
-        product: 'Pesquisar pelo produto do ativo',
-        id_external: 'Pesquisar pelo ID do ativo'
-      };
+      const placeholderByField = consultaSource === 'agentless'
+        ? {
+          name: 'Pesquisar pelo nome do dispositivo',
+          ip: 'Pesquisar pelo IP do dispositivo',
+          hostname: 'Pesquisar pelo hostname do dispositivo',
+          tenant: 'Pesquisar pelo tenant'
+        }
+        : {
+          name: 'Pesquisar pelo nome do ativo',
+          ip: 'Pesquisar pelo IP do ativo',
+          hostname: 'Pesquisar pelo hostname do ativo',
+          product: 'Pesquisar pelo produto do ativo',
+          id_external: 'Pesquisar pelo ID do ativo'
+        };
 
       searchInput.placeholder = placeholderByField[field] || placeholderByField.name;
+    }
+
+    function normalizeAgentlessConsultaRow(row) {
+      const tenantRawName = String(row.custom_name || row.customer_name || '').trim();
+      const tenantName = normalizeTenantDisplay(tenantRawName || 'Tenant não informado');
+      const hostname = row.hostname_lec || row.device_name || row.ip_host || row.ip_lec || '-';
+      const ip = row.ip_host || row.ip_lec || '-';
+      const deviceName = row.device_name || row.hostname_lec || row.ip_host || row.ip_lec || '-';
+      const status = normalizeStatusValue(row.status_lec || row.status || '-');
+      const lastEvent = row.last_event || null;
+      return {
+        id: row.id || row.id_lec || null,
+        idExternal: row.ip_lec || '-',
+        name: deviceName,
+        tenantName,
+        hostname,
+        ip,
+        status,
+        model: '-',
+        vendor: '-',
+        sourceLabel: 'Agentless',
+        lastEvent,
+        raw: row
+      };
+    }
+
+    function renderConsultaTableHead() {
+      const head = document.getElementById('ci-table-head');
+      if (!head) return;
+
+      if (consultaSource === 'agentless') {
+        head.innerHTML = `
+          <tr>
+            <th style="width:19%" data-sort-key="name" class="ci-sortable" aria-sort="none">Dispositivo <span class="ci-sort-indicator" aria-hidden="true"></span></th>
+            <th style="width:19%" data-sort-key="tenant" class="ci-sortable" aria-sort="none">Tenant <span class="ci-sort-indicator" aria-hidden="true"></span></th>
+            <th style="width:14%" data-sort-key="hostname" class="ci-sortable" aria-sort="none">Hostname <span class="ci-sort-indicator" aria-hidden="true"></span></th>
+            <th style="width:14%" data-sort-key="ipHost" class="ci-sortable" aria-sort="none">IP <span class="ci-sort-indicator" aria-hidden="true"></span></th>
+            <th style="width:12%" data-sort-key="status" class="ci-sortable" aria-sort="none">Status <span class="ci-sort-indicator" aria-hidden="true"></span></th>
+            <th style="width:14%" data-sort-key="lastEvent" class="ci-sortable" aria-sort="none">Último evento <span class="ci-sort-indicator" aria-hidden="true"></span></th>
+            <th style="width:8%">Origem</th>
+          </tr>
+        `;
+      } else {
+        head.innerHTML = `
+          <tr>
+            <th style="width:15%" data-sort-key="name" class="ci-sortable" aria-sort="none">Nome <span class="ci-sort-indicator" aria-hidden="true"></span></th>
+            <th style="width:8%" data-sort-key="idExternal" class="ci-sortable" aria-sort="none">ID <span class="ci-sort-indicator" aria-hidden="true"></span></th>
+            <th style="width:12%" data-sort-key="type" class="ci-sortable" aria-sort="none">Tipo <span class="ci-sort-indicator" aria-hidden="true"></span></th>
+            <th style="width:12%" data-sort-key="criticality" class="ci-sortable" aria-sort="none">Criticidade <span class="ci-sort-indicator" aria-hidden="true"></span></th>
+            <th style="width:14%" data-sort-key="ipHost" class="ci-sortable" aria-sort="none">IP / Host <span class="ci-sort-indicator" aria-hidden="true"></span></th>
+            <th style="width:11%" data-sort-key="status" class="ci-sortable" aria-sort="none">Status <span class="ci-sort-indicator" aria-hidden="true"></span></th>
+            <th style="width:14%" data-sort-key="product" class="ci-sortable" aria-sort="none">Produto <span class="ci-sort-indicator" aria-hidden="true"></span></th>
+            <th style="width:14%">Acoes</th>
+          </tr>
+        `;
+      }
+      updateCiSortIndicators();
+    }
+
+    function updateConsultaSourceUI() {
+      const subtitle = document.getElementById('consultaSubtitle');
+      const sourceSwitch = document.getElementById('consultaSourceSwitch');
+      const sourceCurrent = document.getElementById('consultaSourceCurrent');
+      const criticalityWrap = document.getElementById('consultaFilterCriticalityWrap');
+      const lecWrap = document.getElementById('consultaFilterLecWrap');
+
+      if (subtitle) {
+        subtitle.textContent = consultaSource === 'agentless'
+          ? 'Pesquise os dispositivos Agentless por tenant, nome, rede e status.'
+          : 'Pesquise pelos ativos usando tenant, nome, status e criticidade.';
+      }
+
+      if (sourceCurrent) {
+        sourceCurrent.textContent = consultaSource === 'agentless' ? 'Agentless' : 'Agentes';
+      }
+
+      if (sourceSwitch) {
+        sourceSwitch.classList.toggle('is-agentless', consultaSource === 'agentless');
+        sourceSwitch.classList.toggle('is-agents', consultaSource !== 'agentless');
+      }
+
+      if (criticalityWrap) criticalityWrap.hidden = consultaSource !== 'agents';
+      if (lecWrap) lecWrap.hidden = consultaSource !== 'agents';
+
+      const searchField = document.getElementById('searchField');
+      if (searchField) {
+        if (consultaSource === 'agentless') {
+          searchField.innerHTML = `
+            <option value="name">Nome</option>
+            <option value="ip">IP</option>
+            <option value="hostname">Hostname</option>
+            <option value="tenant">Tenant</option>
+          `;
+        } else {
+          searchField.innerHTML = `
+            <option value="name">Nome</option>
+            <option value="ip">IP</option>
+            <option value="hostname">Hostname</option>
+            <option value="product">Produto</option>
+            <option value="id_external">ID</option>
+          `;
+        }
+      }
+
+      updateSearchPlaceholder();
+      renderConsultaTableHead();
+    }
+
+    function setConsultaSource(source, { reload = true } = {}) {
+      const normalized = source === 'agentless' ? 'agentless' : 'agents';
+      if (consultaSource === normalized && reload) {
+        loadCIs({ resetPage: true });
+        return;
+      }
+
+      consultaSource = normalized;
+      ciSortState = { key: null, direction: 'asc' };
+      currentPage = 1;
+      clearDashboardQuickFilter();
+
+      const filterTenant = document.getElementById('filterTenant');
+      const filterCriticality = document.getElementById('filterCriticality');
+      const filterLec = document.getElementById('filterLec');
+
+      if (filterTenant) filterTenant.value = '';
+      if (filterCriticality) filterCriticality.value = '';
+      if (filterLec) filterLec.value = '';
+
+      if (consultaSource === 'agents') {
+        refreshTenantSelects();
+      }
+
+      updateConsultaSourceUI();
+      if (reload) loadCIs({ resetPage: true });
+    }
+
+    async function applyConsultaRouteFromUrl() {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('section') !== 'consulta') return;
+
+      const source = params.get('source') === 'agentless' ? 'agentless' : 'agents';
+      const status = params.get('status') || '';
+      const tenantName = String(params.get('tenant') || '').trim();
+
+      setConsultaSource(source, { reload: false });
+
+      const statusFilter = document.getElementById('filterStatus');
+      if (statusFilter) statusFilter.value = status;
+
+      const tenantFilter = document.getElementById('filterTenant');
+      if (tenantFilter && tenantName) {
+        const normalizedTenant = normalizeTenantKey(tenantName);
+
+        if (source === 'agents') {
+          const match = (catalogs.tenants || []).find((tenant) => {
+            const candidate = String(tenant?.name ?? tenant?.label ?? '').trim();
+            return normalizeTenantKey(candidate) === normalizedTenant;
+          });
+          tenantFilter.value = match
+            ? String(match.id ?? match.value ?? match.name)
+            : '';
+        } else {
+          // No modo agentless, as opções de tenant são carregadas após a primeira consulta.
+          tenantFilter.dataset.pendingTenantName = tenantName;
+        }
+      }
+
+      showSection('consulta', { skipAutoLoad: true });
+      await loadCIs({ resetPage: true });
+
+      if (source === 'agentless' && tenantFilter?.dataset.pendingTenantName) {
+        const normalizedTenant = normalizeTenantKey(tenantFilter.dataset.pendingTenantName);
+        const options = [...tenantFilter.options];
+        const matchedOption = options.find((option) => {
+          const byValue = normalizeTenantKey(option.value || option.textContent);
+          const byText = normalizeTenantKey(option.textContent);
+          return byValue === normalizedTenant || byText === normalizedTenant;
+        });
+        if (matchedOption) {
+          tenantFilter.value = matchedOption.value;
+          await loadCIs({ resetPage: true });
+        }
+        delete tenantFilter.dataset.pendingTenantName;
+      }
+    }
+
+    function sortAgentlessRows(rows) {
+      if (!ciSortState.key) return [...rows];
+      const direction = ciSortState.direction === 'desc' ? -1 : 1;
+      const getValue = (row) => {
+        switch (ciSortState.key) {
+          case 'name': return normalizeText(row.name);
+          case 'tenant': return normalizeText(row.tenantName);
+          case 'hostname': return normalizeText(row.hostname);
+          case 'ipHost': return normalizeText(row.ip);
+          case 'status': return normalizeText(row.status);
+          case 'lastEvent': return toEpoch(row.lastEvent);
+          default: return normalizeText(row.name);
+        }
+      };
+
+      return [...rows].sort((left, right) => {
+        const a = getValue(left);
+        const b = getValue(right);
+        if (a === b) return 0;
+        return a > b ? direction : -direction;
+      });
     }
 
     function toast(message, type = 'success') {
@@ -473,14 +730,15 @@ const DEFAULT_API_BASE = (() => {
        
           <div class="tenant-kpi-header">
             <div class="tenant-kpi-name">${esc(row.tenantName)}</div>
-            <div class="tenant-kpi-top-counts">
-              <div class="tenant-kpi-top-count">
+             <div class="tenant-kpi-top-count">
                 <div class="top-count-label">TOTAL</div>
                 <div class="top-count-value total">${formatCompactNumber(row.total)}</div>
               </div>
+            <div class="tenant-kpi-top-counts">
+             
               <div class="tenant-kpi-top-count">
-                <span class="metric-label">Atenção</span>
-              <span class="metric-value attention">${formatCompactNumber(row.attention)}</span>
+                <div class="metric-label">Atenção</div>
+              <div class="metric-value attention">${formatCompactNumber(row.attention)}</div>
               </div>
             </div>
           </div>
@@ -949,6 +1207,7 @@ const DEFAULT_API_BASE = (() => {
     function openConsultaWithDashboardFilter(kind, value, label) {
       if (!kind || !value) return;
       activeDashboardQuickFilter = { kind, value, label: label || '' };
+      setConsultaSource('agents', { reload: false });
       showSection('consulta', { skipAutoLoad: true });
       loadCIs({ resetPage: true });
       toast(`Filtro aplicado: ${label || 'Dashboard'}`);
@@ -958,6 +1217,7 @@ const DEFAULT_API_BASE = (() => {
       const normalizedTenantName = String(tenantName || '').trim();
       if (!normalizedTenantName) return;
 
+      setConsultaSource('agents', { reload: false });
       clearDashboardQuickFilter();
 
       const tenantFilter = document.getElementById('filterTenant');
@@ -1058,6 +1318,7 @@ const DEFAULT_API_BASE = (() => {
       document.querySelectorAll('.nav-btn').forEach((button) => {
         button.classList.toggle('active', button.dataset.section === id);
       });
+      if (id === 'overview') loadUnifiedDashboard();
       if (id === 'consulta' && !skipAutoLoad) loadCIs();
       if (id === 'dashboard') loadDashboard();
       if (id === 'contatos') loadTenantContacts();
@@ -1076,12 +1337,13 @@ const DEFAULT_API_BASE = (() => {
     }
 
     function normalizeAsset(row) {
+      const tenantRawName = row.tenant_name || row.customer_name || '-';
       return {
         id: row.id,
         idExternal: row.id_asset_external || '-',
         name: row.asset_name || row.name || '-',
         tenantId: row.tenant_id ?? row.fk_tenant ?? null,
-        tenantName: row.tenant_name || row.customer_name || '-',
+        tenantName: normalizeTenantDisplay(tenantRawName),
         typeId: row.asset_type_id ?? null,
         typeName: row.asset_type_name || row.asset_type || row.type || '-',
         criticalityId: row.asset_criticality_id || null,
@@ -1101,6 +1363,213 @@ const DEFAULT_API_BASE = (() => {
         updatedAt: row.updated_at || row.last_updated,
         raw: row
       };
+    }
+
+    function getUnifiedDedupKey(deviceName, ipAddress, tenantName) {
+      const host = normalizeText(deviceName || '');
+      const ip = normalizeText(ipAddress || '');
+      const tenant = normalizeText(tenantName || '');
+      if (host && ip) return `${host}|${ip}`;
+      if (host) return `${host}|${tenant}`;
+      if (ip) return `${ip}|${tenant}`;
+      return `unknown|${tenant}`;
+    }
+
+    function toDateInputEpoch(value, endOfDay = false) {
+      if (!value) return null;
+      const normalized = endOfDay ? `${value}T23:59:59` : `${value}T00:00:00`;
+      const timestamp = new Date(normalized).getTime();
+      return Number.isFinite(timestamp) ? timestamp : null;
+    }
+
+    function normalizeUnifiedStatus(value) {
+      return normalizeStatusValue(value) === 'active' ? 'active' : 'attention';
+    }
+
+    function mergeUnifiedRows(rows) {
+      const grouped = new Map();
+
+      rows.forEach((row) => {
+        const existing = grouped.get(row.key);
+        if (!existing) {
+          grouped.set(row.key, {
+            ...row,
+            sources: new Set([row.source])
+          });
+          return;
+        }
+
+        existing.sources.add(row.source);
+        if (!existing.displayName || existing.displayName === '-') {
+          existing.displayName = row.displayName;
+        }
+        if (!existing.tenantName || existing.tenantName === '-') {
+          existing.tenantName = row.tenantName;
+        }
+        if (!existing.hasEvent && row.hasEvent) {
+          existing.hasEvent = true;
+        }
+
+        const existingEpoch = toEpoch(existing.lastEvent);
+        const candidateEpoch = toEpoch(row.lastEvent);
+        if (candidateEpoch > existingEpoch) {
+          existing.lastEvent = row.lastEvent;
+        }
+
+        if (row.status === 'attention') {
+          existing.status = 'attention';
+        }
+      });
+
+      return [...grouped.values()].map((row) => ({
+        ...row,
+        sourceLabel: row.sources.size > 1 ? 'Agents + Agentless' : [...row.sources][0]
+      }));
+    }
+
+    function applyUnifiedDashboardFilters() {
+      const startDate = document.getElementById('uniStartDate')?.value || '';
+      const endDate = document.getElementById('uniEndDate')?.value || '';
+      const startEpoch = toDateInputEpoch(startDate, false);
+      const endEpoch = toDateInputEpoch(endDate, true);
+
+      let filtered = unifiedDashboardRows.filter((row) => {
+        if (!startEpoch && !endEpoch) return true;
+        if (!row.lastEvent) return false;
+        const rowEpoch = toEpoch(row.lastEvent);
+        if (startEpoch && rowEpoch < startEpoch) return false;
+        if (endEpoch && rowEpoch > endEpoch) return false;
+        return true;
+      });
+
+      if (unifiedDashboardQuickFilter === 'active') {
+        filtered = filtered.filter((row) => row.status === 'active');
+      } else if (unifiedDashboardQuickFilter === 'attention') {
+        filtered = filtered.filter((row) => row.status === 'attention');
+      } else if (unifiedDashboardQuickFilter === 'tenant') {
+        const uniqueTenants = new Set(filtered.map((row) => normalizeText(row.tenantName)).filter(Boolean));
+        const tenantTargets = uniqueTenants;
+        filtered = filtered.filter((row) => tenantTargets.has(normalizeText(row.tenantName)));
+      }
+
+      unifiedDashboardFilteredRows = filtered;
+      renderUnifiedDashboardKpis();
+      renderUnifiedDashboardTable();
+    }
+
+    function renderUnifiedDashboardKpis() {
+      const total = unifiedDashboardFilteredRows.length;
+      const active = unifiedDashboardFilteredRows.filter((row) => row.status === 'active').length;
+      const attention = unifiedDashboardFilteredRows.filter((row) => row.status === 'attention').length;
+      const activeTenants = new Set(
+        unifiedDashboardFilteredRows
+          .map((row) => normalizeText(row.tenantName))
+          .filter(Boolean)
+      ).size;
+
+      const totalNode = document.getElementById('uni-total-assets');
+      const activeNode = document.getElementById('uni-active-assets');
+      const attentionNode = document.getElementById('uni-attention-assets');
+      const tenantsNode = document.getElementById('uni-active-tenants');
+
+      if (totalNode) totalNode.textContent = formatCompactNumber(total);
+      if (activeNode) activeNode.textContent = formatCompactNumber(active);
+      if (attentionNode) attentionNode.textContent = formatCompactNumber(attention);
+      if (tenantsNode) tenantsNode.textContent = formatCompactNumber(activeTenants);
+    }
+
+    function renderUnifiedDashboardTable() {
+      const tableBody = document.getElementById('unified-table-body');
+      const info = document.getElementById('unifiedTableInfo');
+      if (!tableBody || !info) return;
+
+      const total = unifiedDashboardFilteredRows.length;
+      info.textContent = `Exibindo ${formatCompactNumber(total)} ativo(s) após deduplicação por hostname/IP.`;
+
+      if (!total) {
+        tableBody.innerHTML = '<tr><td colspan="5" class="empty">Nenhum item encontrado para os filtros atuais.</td></tr>';
+        return;
+      }
+
+      const sorted = [...unifiedDashboardFilteredRows].sort((a, b) => toEpoch(b.lastEvent) - toEpoch(a.lastEvent));
+
+      tableBody.innerHTML = sorted.map((row) => {
+        const when = row.lastEvent ? formatDate(row.lastEvent) : 'Sem evento';
+        return `
+          <tr>
+            <td class="cell-primary">${esc(row.displayName || '-')}</td>
+            <td>${esc(row.tenantName || '-')}</td>
+            <td>${esc(row.sourceLabel)}</td>
+            <td>${statusPill(row.status === 'active' ? 'active' : 'disconnected')}</td>
+            <td>${esc(when)}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function setUnifiedDashboardFilter(filter) {
+      unifiedDashboardQuickFilter = filter || 'all';
+      document.querySelectorAll('[data-overview-filter]').forEach((card) => {
+        card.classList.toggle('is-active', card.dataset.overviewFilter === unifiedDashboardQuickFilter);
+      });
+      applyUnifiedDashboardFilters();
+    }
+
+    async function loadUnifiedDashboard() {
+      try {
+        const [assetsResponse, lecResponse] = await Promise.all([
+          request('/assets'),
+          request('/lec-logs')
+        ]);
+        if (!assetsResponse.ok) throw new Error(`Assets HTTP ${assetsResponse.status}`);
+        if (!lecResponse.ok) throw new Error(`LEC HTTP ${lecResponse.status}`);
+
+        const assetsRaw = await assetsResponse.json();
+        const lecRaw = await lecResponse.json();
+
+        const assetsRows = assetsRaw.map((row) => {
+          const normalized = normalizeAsset(row);
+          const deviceName = normalized.hostname !== '-' ? normalized.hostname : normalized.name;
+          const ip = normalized.ip !== '-' ? normalized.ip : '';
+          return {
+            key: getUnifiedDedupKey(deviceName, ip, normalized.tenantName),
+            displayName: deviceName || normalized.name || '-',
+            tenantName: normalized.tenantName || '-',
+            source: 'Agents',
+            status: normalizeUnifiedStatus(normalized.status),
+            lastEvent: normalized.updatedAt || normalized.createdAt || null,
+            hasEvent: Boolean(normalized.updatedAt || normalized.createdAt)
+          };
+        });
+
+        const lecRows = lecRaw.map((row) => {
+          const tenantName = row.custom_name || row.customer_name || '-';
+          const deviceName = row.hostname_lec || row.device_name || row.ip_host || row.ip_lec || '-';
+          const ip = row.ip_host || row.ip_lec || '';
+          return {
+            key: getUnifiedDedupKey(deviceName, ip, tenantName),
+            displayName: deviceName,
+            tenantName,
+            source: 'Agentless',
+            status: normalizeUnifiedStatus(row.status_lec || row.status),
+            lastEvent: row.last_event || null,
+            hasEvent: Boolean(row.last_event)
+          };
+        });
+
+        unifiedDashboardRows = mergeUnifiedRows([...assetsRows, ...lecRows]);
+        applyUnifiedDashboardFilters();
+      } catch (error) {
+        console.error('Erro ao carregar dashboard geral:', error);
+        const tableBody = document.getElementById('unified-table-body');
+        if (tableBody) {
+          tableBody.innerHTML = '<tr><td colspan="5" class="empty">Erro ao carregar dados consolidados.</td></tr>';
+        }
+        ['uni-total-assets', 'uni-active-assets', 'uni-attention-assets', 'uni-active-tenants'].forEach((id) => {
+          const node = document.getElementById(id);
+          if (node) node.textContent = '-';
+        });
+      }
     }
 
     function getCriticalityWeight(ci) {
@@ -2169,11 +2638,29 @@ const DEFAULT_API_BASE = (() => {
       updateCiSortIndicators();
 
       const tbody = document.getElementById('ci-table');
+      const columnCount = consultaSource === 'agentless' ? 7 : 8;
       if (!sortedList.length) {
-        tbody.innerHTML = '<tr class="empty-row"><td colspan="8" class="empty">Nenhum item encontrado.</td></tr>';
+        tbody.innerHTML = `<tr class="empty-row"><td colspan="${columnCount}" class="empty">Nenhum item encontrado.</td></tr>`;
         renderPagination(totalCIs, 0);
         return;
       }
+
+      if (consultaSource === 'agentless') {
+        tbody.innerHTML = sortedList.map((ci) => `
+          <tr>
+            <td data-label="Dispositivo" title="${esc(ci.name)}" class="cell-primary">${esc(ci.name)}</td>
+            <td data-label="Tenant" title="${esc(ci.tenantName || '-')}">${esc(ci.tenantName || '-')}</td>
+            <td data-label="Hostname" class="mono">${esc(ci.hostname || '-')}</td>
+            <td data-label="IP" class="mono">${esc(ci.ip || '-')}</td>
+            <td data-label="Status">${statusPill(ci.status)}</td>
+            <td data-label="Último evento">${esc(ci.lastEvent ? formatDate(ci.lastEvent) : '-')}</td>
+            <td data-label="Origem">Agentless</td>
+          </tr>
+        `).join('');
+        renderPagination(totalCIs, sortedList.length);
+        return;
+      }
+
       tbody.innerHTML = sortedList.map((ci, index) => `
         <tr>
           <td data-label="Nome" title="${esc(ci.name)}" class="cell-primary">${esc(ci.name)}</td>
@@ -2227,6 +2714,10 @@ const DEFAULT_API_BASE = (() => {
     }
 
     async function loadCIs({ resetPage = false } = {}) {
+      if (consultaSource === 'agentless') {
+        return loadAgentlessCIs({ resetPage });
+      }
+
       if (resetPage) currentPage = 1;
       const requestSeq = ++ciLoadRequestSeq;
 
@@ -2286,6 +2777,80 @@ const DEFAULT_API_BASE = (() => {
         visibleCIs = [];
         totalCIs = 0;
         tbody.innerHTML = '<tr class="empty-row"><td colspan="8" class="empty">Nao foi possivel carregar da API. Verifique a URL e tente novamente.</td></tr>';
+        renderPagination(0, 0);
+      }
+    }
+
+    async function loadAgentlessCIs({ resetPage = false } = {}) {
+      if (resetPage) currentPage = 1;
+      const requestSeq = ++ciLoadRequestSeq;
+
+      const query = document.getElementById('searchQ').value.trim();
+      const searchField = document.getElementById('searchField').value || 'name';
+      const rawStatus = document.getElementById('filterStatus').value;
+      const status = normalizeStatusValue(rawStatus);
+      const attentionOnly = status === 'attention';
+      const tenantNameFilter = document.getElementById('filterTenant').value;
+
+      const tbody = document.getElementById('ci-table');
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="7" class="empty">Carregando...</td></tr>';
+
+      try {
+        const response = await request('/lec-logs');
+        if (requestSeq !== ciLoadRequestSeq) return;
+        if (!response.ok) throw new Error(String(response.status));
+
+        const raw = await response.json();
+        if (requestSeq !== ciLoadRequestSeq) return;
+        const rows = (Array.isArray(raw) ? raw : []).map(normalizeAgentlessConsultaRow);
+
+        const tenantSelect = document.getElementById('filterTenant');
+        if (tenantSelect) {
+          const currentValue = tenantSelect.value;
+          const tenants = [...new Set(rows.map((row) => String(row.tenantName || '').trim()).filter(Boolean))]
+            .sort((a, b) => a.localeCompare(b, 'pt-BR'));
+          tenantSelect.innerHTML = `<option value="">Todos os tenants</option>${tenants.map((tenant) => `<option value="${esc(tenant)}">${esc(tenant)}</option>`).join('')}`;
+          tenantSelect.value = tenants.includes(currentValue) ? currentValue : '';
+        }
+
+        let filtered = rows;
+        if (query) {
+          const normalizedQuery = normalizeText(query);
+          filtered = filtered.filter((row) => {
+            const byField = {
+              name: row.name,
+              ip: row.ip,
+              hostname: row.hostname,
+              tenant: row.tenantName
+            };
+            return normalizeText(byField[searchField] || '').includes(normalizedQuery);
+          });
+        }
+
+        if (attentionOnly) {
+          filtered = filtered.filter((row) => row.status !== 'active');
+        } else if (status) {
+          filtered = filtered.filter((row) => row.status === status);
+        }
+
+        if (tenantNameFilter) {
+          const normalizedTenant = normalizeTenantKey(tenantNameFilter);
+          filtered = filtered.filter((row) => normalizeTenantKey(row.tenantName) === normalizedTenant);
+        }
+
+        const sorted = sortAgentlessRows(filtered);
+        totalCIs = sorted.length;
+        const totalPages = Math.max(1, Math.ceil(totalCIs / pageSize));
+        if (currentPage > totalPages) currentPage = totalPages;
+        const offset = (currentPage - 1) * pageSize;
+        const pageItems = sorted.slice(offset, offset + pageSize);
+
+        renderTable(pageItems);
+      } catch {
+        if (requestSeq !== ciLoadRequestSeq) return;
+        visibleCIs = [];
+        totalCIs = 0;
+        tbody.innerHTML = '<tr class="empty-row"><td colspan="7" class="empty">Nao foi possivel carregar Agentless da API. Verifique a URL e tente novamente.</td></tr>';
         renderPagination(0, 0);
       }
     }
@@ -2576,7 +3141,14 @@ const DEFAULT_API_BASE = (() => {
 
     function bindEvents() {
       document.querySelectorAll('.nav-btn').forEach((button) => {
-        button.addEventListener('click', () => showSection(button.dataset.section));
+        button.addEventListener('click', () => {
+          const sectionId = button.dataset.section;
+          if (sectionId === 'consulta') {
+            openConsultaSourceModal();
+            return;
+          }
+          showSection(sectionId);
+        });
       });
 
       document.getElementById('clearAssetBtn').addEventListener('click', clearAssetForm);
@@ -2660,6 +3232,7 @@ const DEFAULT_API_BASE = (() => {
       });
       document.getElementById('reloadCisBtn').addEventListener('click', () => loadCIs());
       document.getElementById('clearFiltersBtn').addEventListener('click', clearFilters);
+      document.getElementById('changeConsultaSourceBtn').addEventListener('click', openConsultaSourceModal);
 
       document.getElementById('dashboardQualityInsights').addEventListener('click', (event) => {
         const card = event.target.closest('[data-filter-kind][data-filter-value]');
@@ -2732,6 +3305,7 @@ const DEFAULT_API_BASE = (() => {
       });
 
       document.getElementById('ci-table').addEventListener('click', (event) => {
+        if (consultaSource !== 'agents') return;
         const button = event.target.closest('button[data-action]');
         if (!button) return;
         const ci = visibleCIs[Number(button.dataset.index)];
@@ -2751,6 +3325,10 @@ const DEFAULT_API_BASE = (() => {
         if (!th) return;
         const key = th.dataset.sortKey;
         if (!key) return;
+
+        if (consultaSource === 'agentless' && !['name', 'tenant', 'hostname', 'ipHost', 'status', 'lastEvent'].includes(key)) {
+          return;
+        }
 
         if (ciSortState.key === key) {
           ciSortState.direction = ciSortState.direction === 'asc' ? 'desc' : 'asc';
@@ -2775,6 +3353,13 @@ const DEFAULT_API_BASE = (() => {
       document.getElementById('confirmModalActionBtn').addEventListener('click', () => closeConfirmDialog(true));
       document.getElementById('confirmModal').addEventListener('click', (event) => {
         if (event.target.id === 'confirmModal') closeConfirmDialog(false);
+      });
+
+      document.getElementById('closeConsultaSourceModalBtn').addEventListener('click', closeConsultaSourceModal);
+      document.getElementById('pickConsultaAgentsBtn').addEventListener('click', () => pickConsultaSource('agents'));
+      document.getElementById('pickConsultaAgentlessBtn').addEventListener('click', () => pickConsultaSource('agentless'));
+      document.getElementById('consultaSourceModal').addEventListener('click', (event) => {
+        if (event.target.id === 'consultaSourceModal') closeConsultaSourceModal();
       });
 
       document.getElementById('detail-tags-list').addEventListener('click', (event) => {
@@ -2824,11 +3409,42 @@ const DEFAULT_API_BASE = (() => {
 
       document.getElementById('refreshLecLogsBtn').addEventListener('click', loadLecLogs);
 
+      const refreshUnifiedDashboardBtn = document.getElementById('refreshUnifiedDashboardBtn');
+      if (refreshUnifiedDashboardBtn) {
+        refreshUnifiedDashboardBtn.addEventListener('click', loadUnifiedDashboard);
+      }
+
+      const uniApplyPeriodBtn = document.getElementById('uniApplyPeriodBtn');
+      if (uniApplyPeriodBtn) {
+        uniApplyPeriodBtn.addEventListener('click', applyUnifiedDashboardFilters);
+      }
+
+      const uniResetPeriodBtn = document.getElementById('uniResetPeriodBtn');
+      if (uniResetPeriodBtn) {
+        uniResetPeriodBtn.addEventListener('click', () => {
+          const startNode = document.getElementById('uniStartDate');
+          const endNode = document.getElementById('uniEndDate');
+          if (startNode) startNode.value = '';
+          if (endNode) endNode.value = '';
+          setUnifiedDashboardFilter('all');
+        });
+      }
+
+      document.querySelectorAll('[data-overview-filter]').forEach((card) => {
+        card.addEventListener('click', () => setUnifiedDashboardFilter(card.dataset.overviewFilter || 'all'));
+        card.addEventListener('keydown', (event) => {
+          if (event.key !== 'Enter' && event.key !== ' ') return;
+          event.preventDefault();
+          setUnifiedDashboardFilter(card.dataset.overviewFilter || 'all');
+        });
+      });
+
       document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape') {
           closeDetail();
           closeTenantModal();
           closeConfirmDialog(false);
+          closeConsultaSourceModal();
         }
       });
     }
@@ -2837,10 +3453,12 @@ const DEFAULT_API_BASE = (() => {
       bindEvents();
       ensureDashboardStatusMonitor();
       refreshDashboardStatusIndicator();
+      updateConsultaSourceUI();
       updateSearchPlaceholder();
       renderDynamicTagsFields();
       try {
-        await Promise.all([loadCatalogs(), loadDashboard(), loadCIs()]);
+        await Promise.all([loadCatalogs(), loadUnifiedDashboard(), loadDashboard(), loadCIs()]);
+        await applyConsultaRouteFromUrl();
       } catch (error) {
         console.error('Erro ao inicializar aplicação:', error);
         toast('Erro ao carregar dados iniciais. Por favor, recarregue a página.', 'error');

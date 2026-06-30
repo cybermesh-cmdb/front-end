@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;700;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="./styles.css" />
+  <link rel="stylesheet" href="./styles.css?v=__BUILD_VERSION__" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -33,7 +33,8 @@
     </header>
 
     <nav class="nav" aria-label="Seções do CMDB">
-      <button class="nav-btn active" type="button" data-section="dashboard">Dashboard</button>
+      <a class="nav-btn" href="./dashboard.html" data-section="overview">Dashboard</a>
+      <button class="nav-btn active" type="button" data-section="dashboard">Agents</button>
       <button class="nav-btn" type="button" data-section="lec-logs">Agentless</button>
       <button class="nav-btn" type="button" data-section="consulta">Consultar</button>
       <button class="nav-btn" type="button" data-section="tenants">Tenants</button>
@@ -42,6 +43,87 @@
     </nav>
 
     <main class="content">
+      <section class="section" id="sec-overview" aria-labelledby="overview-title">
+        <div class="page-title">
+          <div>
+            <h2 id="overview-title">Dashboard Geral</h2>
+            <p>Visão consolidada de Agents e Agentless com deduplicação por hostname/IP e leitura por tenant.</p>
+          </div>
+          <button class="btn" type="button" id="refreshUnifiedDashboardBtn">Atualizar</button>
+        </div>
+
+        <section class="card" aria-label="Filtros da dashboard geral">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Período de análise</div>
+              <div class="card-subtitle">Use intervalo por data para focar os eventos mais recentes.</div>
+            </div>
+          </div>
+          <div class="search-bar" aria-label="Filtro por período">
+            <div class="search-select">
+              <label class="sr-only" for="uniStartDate">Data inicial</label>
+              <input id="uniStartDate" type="date" />
+            </div>
+            <div class="search-select">
+              <label class="sr-only" for="uniEndDate">Data final</label>
+              <input id="uniEndDate" type="date" />
+            </div>
+            <div class="search-actions">
+              <button class="btn" id="uniResetPeriodBtn" type="button">Limpar período</button>
+              <button class="btn primary" id="uniApplyPeriodBtn" type="button">Aplicar</button>
+            </div>
+          </div>
+        </section>
+
+        <div class="stats-grid" aria-label="KPIs gerais">
+          <article class="stat stat-interactive is-active" data-overview-filter="all" tabindex="0" role="button">
+            <div class="stat-label">Total de ativos</div>
+            <div class="stat-value" id="uni-total-assets">-</div>
+            <div class="stat-note">Soma deduplicada entre Agents e Agentless.</div>
+          </article>
+          <article class="stat stat-interactive" data-overview-filter="active" tabindex="0" role="button">
+            <div class="stat-label">Ativos em operação</div>
+            <div class="stat-value" id="uni-active-assets">-</div>
+            <div class="stat-note">Itens com status saudável.</div>
+          </article>
+          <article class="stat stat-interactive" data-overview-filter="attention" tabindex="0" role="button">
+            <div class="stat-label">Em atenção</div>
+            <div class="stat-value" id="uni-attention-assets">-</div>
+            <div class="stat-note">Itens com status fora, pending, disconnected ou sem dados.</div>
+          </article>
+          <article class="stat stat-interactive" data-overview-filter="tenant" tabindex="0" role="button">
+            <div class="stat-label">Número de tenants ativos</div>
+            <div class="stat-value" id="uni-active-tenants">-</div>
+            <div class="stat-note">Tenants com ao menos um ativo após os filtros.</div>
+          </article>
+        </div>
+
+        <section class="card" aria-labelledby="unified-table-title">
+          <div class="card-header">
+            <div>
+              <div class="card-title" id="unified-table-title">Consolidado por tenant</div>
+              <div class="card-subtitle" id="unifiedTableInfo">Carregando dados consolidados...</div>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="dash-table">
+              <thead>
+                <tr>
+                  <th style="width:26%">Dispositivo</th>
+                  <th style="width:20%">Tenant</th>
+                  <th style="width:15%">Origem</th>
+                  <th style="width:15%">Status</th>
+                  <th style="width:24%">Último evento</th>
+                </tr>
+              </thead>
+              <tbody id="unified-table-body">
+                <tr><td colspan="5" class="empty">Carregando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
       <section class="section active" id="sec-dashboard" aria-labelledby="dashboard-title">
         <div class="page-title">
           <div>
@@ -268,9 +350,15 @@
         <div class="page-title">
           <div>
             <h2 id="consulta-title">Consultar itens de configuração</h2>
-            <p>Pesquise pelos ativos usando tenant, nome, status e criticidade.</p>
+            <p id="consultaSubtitle">Pesquise pelos ativos usando tenant, nome, status e criticidade.</p>
           </div>
+          <div class="consulta-source-switch" id="consultaSourceSwitch">
+          <span class="consulta-source-value" id="consultaSourceCurrent" aria-live="polite">Agentes</span>
+          <button class="btn" id="changeConsultaSourceBtn" type="button">Trocar</button>
         </div>
+        </div>
+
+        
 
         <div class="search-bar" aria-label="Filtros de consulta">
           <div class="search-select">
@@ -305,13 +393,13 @@
               <option value="never_connected">Never connected</option>
             </select>
           </div>
-          <div class="search-select">
+          <div class="search-select" id="consultaFilterCriticalityWrap">
             <label class="sr-only" for="filterCriticality">Filtrar por criticidade</label>
             <select id="filterCriticality">
               <option value="">Todas as criticidades</option>
             </select>
           </div>
-          <div class="search-select">
+          <div class="search-select" id="consultaFilterLecWrap">
             <label class="sr-only" for="filterLec">Filtrar por LEC</label>
             <select id="filterLec">
               <option value="">Todos com e sem LEC</option>
@@ -342,7 +430,7 @@
                 </tr>
               </thead>
               <tbody id="ci-table">
-                <tr class="empty-row"><td colspan="7" class="empty">Carregando dados da API...</td></tr>
+                <tr class="empty-row"><td colspan="8" class="empty">Carregando dados da API...</td></tr>
               </tbody>
             </table>
           </div>
@@ -566,10 +654,26 @@
       </div>
     </div>
 
+    <div class="detail-modal" id="consultaSourceModal" aria-hidden="true">
+      <div class="detail-box" role="dialog" aria-modal="true" aria-labelledby="consulta-source-modal-title" style="max-width:520px">
+        <div class="detail-header">
+          <div>
+            <div class="card-title" id="consulta-source-modal-title">Escolha a origem da consulta</div>
+            <div class="card-subtitle">Selecione se deseja consultar Agentes ou Agentless.</div>
+          </div>
+          <button class="btn" id="closeConsultaSourceModalBtn" type="button">Fechar</button>
+        </div>
+        <div class="form-actions" style="justify-content:flex-start; padding-top:12px;">
+          <button class="btn primary" id="pickConsultaAgentsBtn" type="button">Agentes</button>
+          <button class="btn" id="pickConsultaAgentlessBtn" type="button">Agentless</button>
+        </div>
+      </div>
+    </div>
+
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
   </div>
 
-  <script src="./app.js"></script>
+  <script src="./app.js?v=__BUILD_VERSION__"></script>
 </body>
 </html>
 

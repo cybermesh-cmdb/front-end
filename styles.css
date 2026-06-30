@@ -386,7 +386,7 @@
 
   .stat {
     position: relative;
-    padding: 20px;
+    padding: 15px;
     border: 1px solid var(--border-dim);
     border-radius: var(--r-xl);
     background: linear-gradient(135deg, rgba(18, 14, 31, 0.8), rgba(18, 14, 31, 0.6));
@@ -634,22 +634,24 @@
 
   #dashboardTenantsSection {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 3fr));
-    gap: 16px;
-    /* margin-bottom: 20px; */
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 12px;
   }
 
   .tenant-kpi-card {
     position: relative;
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    border: 2px solid var(--border-dim);
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
-    background: linear-gradient(135deg, rgba(18, 14, 31, 0.8), rgba(18, 14, 31, 0.6));
-    padding: 16px;
-    border-radius: var(--r-md);
+    gap: 8px;
+    border: 1px solid rgba(241, 72, 113, 0.58);
+    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    background:
+      radial-gradient(circle at 15% -20%, rgba(255, 66, 114, 0.16), transparent 40%),
+      linear-gradient(160deg, #110f2a 0%, #09071b 100%);
+    padding: 12px 14px;
+    border-radius: 12px;
     overflow: hidden;
+    box-shadow: 0 18px 35px rgba(4, 3, 17, 0.45);
   }
 
   .tenant-kpi-card::before {
@@ -658,51 +660,127 @@
     top: 0;
     left: 0;
     right: 0;
-    height: 3px;
-    background: linear-gradient(90deg, transparent, rgba(167, 139, 250, 0.3), transparent);
+    height: 2px;
+    background: linear-gradient(90deg, rgba(255, 80, 121, 0.2), rgba(255, 80, 121, 0.85), rgba(255, 80, 121, 0.2));
   }
 
   .tenant-kpi-card:hover {
-    border-color: var(--border-mid);
-    box-shadow: 0 12px 28px rgba(139, 92, 246, 0.18);
+    border-color: rgba(255, 113, 145, 0.8);
+    box-shadow: 0 22px 40px rgba(4, 3, 17, 0.55);
     transform: translateY(-2px);
+  }
+
+  .tenant-kpi-card.is-active {
+    border-color: rgba(255, 151, 174, 0.95);
+    box-shadow: 0 0 0 1px rgba(255, 151, 174, 0.35) inset, 0 22px 40px rgba(4, 3, 17, 0.55);
   }
 
   .tenant-kpi-header {
     display: flex;
     justify-content: space-between;
-    align-items: flex-start;
-    gap: 5px;
+    align-items: center;
+    gap: 1px;
   }
 
   .tenant-kpi-name {
     font-size: 16px;
     font-weight: 900;
     color: var(--text-primary);
-    letter-spacing: -0.01em;
-    line-height: 1.2;
+    letter-spacing: -0.02em;
+    line-height: 1.05;
     flex: 1;
+    text-shadow: 0 4px 12px rgba(2, 2, 7, 0.7);
   }
 
-  .tenant-kpi-top-counts {
+  .tenant-attention-box {
     display: flex;
-    gap: 16px;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .tenant-attention-label {
+    font-size: 12px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #b7abff;
+  }
+
+  .tenant-attention-values {
+    display: flex;
+    gap: 12px;
     align-items: flex-start;
   }
 
-  .tenant-kpi-top-count {
+  .attention-source {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 2px;
     text-align: right;
   }
 
+  .attention-source.is-clickable {
+    border: 1px solid rgba(167, 139, 250, 0.25);
+    border-radius: 8px;
+    background: rgba(15, 12, 32, 0.55);
+    padding: 4px 8px;
+    cursor: pointer;
+    transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .attention-source.is-clickable:hover,
+  .attention-source.is-clickable:focus-visible {
+    border-color: rgba(255, 95, 132, 0.7);
+    box-shadow: 0 0 0 2px rgba(255, 95, 132, 0.2);
+    transform: translateY(-1px);
+    outline: none;
+  }
+
+  .attention-value {
+    align-self: anchor-center;
+    font-size: 20px;
+    font-weight: 900;
+    line-height: 1;
+    color: #ff5f84;
+    text-shadow: 0 5px 14px rgba(255, 95, 132, 0.28);
+  }
+
+  .attention-caption {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.09em;
+    color: rgba(206, 201, 255, 0.82);
+    text-transform: uppercase;
+  }
+
+  .tenant-kpi-main-row {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 1px;
+    align-items: center;
+    padding: 6px 0 4px;
+  }
+
+  .tenant-total-box {
+    min-width: 55px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: center;
+    justify-content: center;
+    border-right: 1px solid rgba(223, 216, 255, 0.12);
+    border-left: 1px solid rgba(223, 216, 255, 0.12);
+    padding-right: 2px;
+  }
+
   .top-count-label {
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 800;
     text-transform: uppercase;
-    letter-spacing: 0.07em;
-    color: var(--text-secondary);
+    letter-spacing: 0.11em;
+    color: rgba(206, 201, 255, 0.82);
+    padding-right: 5px;
   }
 
   .top-count-value {
@@ -718,67 +796,68 @@
   .top-count-value.total {
     font-size: 20px;
     color: var(--text-primary);
-    align-self: center;
+    justify-self: center;
   }
 
-  .tenant-kpi-metrics {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
+  .tenant-kpi-summary {
+    display: flex;
+    justify-content: space-between;
+    gap: 6px;
+    padding-left: 2px;
   }
 
   .tenant-kpi-metric-row {
     display: flex;
     flex-direction: column;
-    gap: 3px;
-    padding: 3px;
-    border-radius: var(--r-md);
-    background: rgba(18, 14, 31, 0.65);
-    border: 1px solid rgba(139, 92, 246, 0.12);
+    gap: 4px;
+    padding: 2px 4px;
     align-items: center;
+    min-width: 84px;
   }
 
   .metric-label {
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 800;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--purple-400);
+    letter-spacing: 0.08em;
+    color: rgba(206, 201, 255, 0.82);
+    padding-left: 5px;
+    border-left: 3px solid;
   }
 
   .metric-value {
     font-size: 20px;
     font-weight: 900;
     line-height: 1;
+    align-self: center;
+    color: var(--text-primary);
   }
 
   .metric-value.active {
-    color: var(--green-400);
+    color: #d7ffe7;
   }
 
   .metric-value.attention {
-    color: var(--rose-400);
-    align-self: center;
-  
+    color: #ff6e90;
+    justify-self: center;
   }
 
   .tenant-kpi-recent {
     display: flex;
     flex-direction: column;
     gap: 4px;
-    padding-top: 12px;
-    border-top: 1px solid rgba(139, 92, 246, 0.12);
-  }
-
-  .tenant-kpi-actions {
-    display: flex;
-    justify-content: flex-end;
     padding-top: 10px;
-    border-top: 1px dashed rgba(139, 92, 246, 0.2);
+    border-top: 1px solid rgba(226, 219, 255, 0.14);
   }
 
-  .tenant-kpi-actions .btn {
-    min-width: 110px;
+  .recent-label {
+    font-size: 16px;
+    letter-spacing: -0.01em;
+    color: #ffffff;
+    text-shadow: 0 4px 12px rgba(2, 2, 7, 0.68);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .recent-asset {
@@ -791,19 +870,19 @@
   }
 
   .recent-time {
-    font-size: 12px;
-    color: var(--text-muted);
+    font-size: 15px;
+    color: #9f95ce;
+    letter-spacing: 0.01em;
   }
 
   .tenant-kpi-card.has-attention {
-    border-color:  rgba(221, 18, 21, 0.55);
+    border-color: rgba(241, 72, 113, 0.75);
     border-width: 1px;
-    /* background: linear-gradient(135deg, rgba(251, 113, 133, 0.05) 0%, rgba(18, 14, 31, 0.6) 100%); */
-    box-shadow: 0 0 0 1px rgba(251, 113, 133, 0.2) inset;
+    box-shadow: 0 0 0 1px rgba(255, 94, 134, 0.24) inset, 0 18px 35px rgba(4, 3, 17, 0.45);
   }
 
   .tenant-kpi-card.has-attention::before {
-    background: linear-gradient(90deg, transparent, #fb7185, transparent);
+    background: linear-gradient(90deg, rgba(255, 80, 121, 0.25), #ff5f84, rgba(255, 80, 121, 0.25));
   }
 
   .attention-badge {
@@ -1497,6 +1576,48 @@
     border-radius: var(--r-xl);
     background: rgba(14, 11, 26, 0.58);
     overflow: hidden;
+  }
+
+  .consulta-source-switch {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 0 0 12px;
+    padding: 10px 12px;
+    border: 1px solid var(--border-dim);
+    border-radius: var(--r-lg);
+    background: rgba(14, 11, 26, 0.64);
+    max-width: fit-content;
+  }
+
+  .consulta-source-caption {
+    font-size: 12px;
+    color: var(--text-secondary);
+    letter-spacing: 0.02em;
+    margin-right: 2px;
+  }
+
+  .consulta-source-value {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--border-mid);
+    background: rgba(34, 197, 94, 0.14);
+    color: #bdfccf;
+    font-weight: 800;
+    letter-spacing: 0.01em;
+  }
+
+  .consulta-source-switch.is-agentless .consulta-source-value {
+    background: rgba(14, 165, 233, 0.18);
+    border-color: rgba(56, 189, 248, 0.55);
+    color: #b9ebff;
+  }
+
+  .consulta-source-switch .btn {
+    margin-left: auto;
   }
 
   .search-bar {
@@ -2361,7 +2482,23 @@
     
     #dashboardTenantsSection { grid-template-columns: 1fr; }
     .tenant-kpi-header { flex-direction: column; align-items: flex-start; gap: 12px; }
-    .tenant-kpi-metrics { grid-template-columns: 1fr; }
+    .tenant-attention-box { align-items: flex-start; }
+    .tenant-attention-values { gap: 14px; }
+    .tenant-kpi-main-row { grid-template-columns: 1fr; gap: 12px; }
+    .tenant-total-box {
+      border-right: 0;
+      border-bottom: 1px solid rgba(223, 216, 255, 0.12);
+      padding-right: 0;
+      padding-bottom: 10px;
+      align-items: flex-start;
+    }
+    .tenant-kpi-summary { justify-content: flex-start; padding-left: 0; }
+    .tenant-kpi-name { font-size: 18px; }
+    .attention-value { font-size: 24px; }
+    .top-count-value.total { font-size: 28px; }
+    .metric-value { font-size: 18px; }
+    .recent-label { font-size: 16px; white-space: normal; }
+    .recent-time { font-size: 13px; }
     .criticality-band-grid { grid-template-columns: 1fr; }
     .chart-shell,
     .chart-shell-tall,
@@ -2381,8 +2518,14 @@
     .status-donut { width: 156px; }
     
     .tenant-kpi-header { flex-direction: column; align-items: flex-start; }
-    .tenant-kpi-top-counts { width: 100%; }
-    .tenant-kpi-metrics { grid-template-columns: 1fr; }
+    .tenant-attention-values { width: 100%; justify-content: space-between; }
+    .tenant-kpi-summary { width: 100%; justify-content: space-between; }
+    .tenant-kpi-name { font-size: 16px; }
+    .attention-value { font-size: 22px; }
+    .top-count-value.total { font-size: 24px; }
+    .metric-value { font-size: 16px; }
+    .recent-label { font-size: 14px; }
+    .recent-time { font-size: 12px; }
   }
 
   @media (max-width: 760px) {
