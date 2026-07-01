@@ -1772,13 +1772,14 @@
   .table-actions {
     display: flex;
     gap: 6px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
   }
 
   .table-actions .btn {
     min-height: 30px;
     padding: 5px 12px;
     font-size: 12px;
+    white-space: nowrap;
   }
 
   .cell-actions {

@@ -134,22 +134,22 @@
         </div>
 
         <div class="stats-grid">
-          <article class="stat">
+          <article class="stat stat-interactive" data-consulta-card="true" data-consulta-source="agents" data-consulta-label="Total de ativos (Agents)" role="button" tabindex="0" aria-label="Abrir consulta de agents com todos os ativos">
             <div class="stat-label">Total de ativos</div>
             <div class="stat-value" id="dash-total-assets">-</div>
             <div class="stat-note">Base completa de itens de configuração catalogados.</div>
           </article>
-          <article class="stat">
+          <article class="stat stat-interactive" data-consulta-card="true" data-consulta-source="agents" data-consulta-status="active" data-consulta-label="Ativos em operação (Agents)" role="button" tabindex="0" aria-label="Abrir consulta de agents em operação">
             <div class="stat-label">Ativos em operação</div>
             <div class="stat-value" id="dash-active-assets">-</div>
             <div class="stat-note">Itens com status ativo no ambiente operacional.</div>
           </article>
-          <article class="stat">
+          <article class="stat stat-interactive" data-consulta-card="true" data-consulta-source="agents" data-consulta-status="attention" data-consulta-label="Exigem atenção (Agents)" role="button" tabindex="0" aria-label="Abrir consulta de agents que exigem atenção">
             <div class="stat-label">Exigem atenção</div>
             <div class="stat-value" id="dash-attention-assets">-</div>
             <div class="stat-note">Disconnected, Pending ou Never connected.</div>
           </article>
-          <article class="stat">
+          <article class="stat stat-interactive" data-consulta-card="true" data-consulta-source="agents" data-consulta-lec="1" data-consulta-label="Número de LECs (Agents)" role="button" tabindex="0" aria-label="Abrir consulta de agents com LEC">
             <div class="stat-label">Número de LECs</div>
             <div class="stat-value" id="dash-lec-assets">-</div>
             <div class="stat-note">Quantidade de ativos marcados como LEC.</div>
@@ -465,22 +465,22 @@
         </div>
 
         <div class="stats-grid" aria-label="KPIs de Agentless">
-          <article class="stat">
+          <article class="stat stat-interactive" data-consulta-card="true" data-consulta-source="agentless" data-consulta-label="Dispositivos monitorados (Agentless)" role="button" tabindex="0" aria-label="Abrir consulta de todos os dispositivos agentless">
             <div class="stat-label">Dispositivos Monitorados</div>
             <div class="stat-value" id="lecKpiTotalDevices">0</div>
             <div class="stat-note">Total retornado pela integração Agentless.</div>
           </article>
-          <article class="stat">
+          <article class="stat stat-interactive" data-consulta-card="true" data-consulta-source="agentless" data-consulta-status="active" data-consulta-label="Dispositivos em operação (Agentless)" role="button" tabindex="0" aria-label="Abrir consulta de agentless em operação">
             <div class="stat-label">Dispositivos Em Operação</div>
             <div class="stat-value" id="lecKpiHealthyDevices">0</div>
             <div class="stat-note">Status online, active, ativo ou ok.</div>
           </article>
-          <article class="stat">
+          <article class="stat stat-interactive" data-consulta-card="true" data-consulta-source="agentless" data-consulta-status="attention" data-consulta-label="Agentless em atenção" role="button" tabindex="0" aria-label="Abrir consulta de agentless em atenção">
             <div class="stat-label">Em atenção</div>
             <div class="stat-value" id="lecKpiAttentionDevices">0</div>
             <div class="stat-note">Status fora, disconnected, offline, pending ou inativo.</div>
           </article>
-          <article class="stat">
+          <article class="stat stat-interactive" data-consulta-card="true" data-consulta-source="agentless" data-consulta-status="attention" data-consulta-agentless-filter="no_event" data-consulta-label="Agentless sem evento recente" role="button" tabindex="0" aria-label="Abrir consulta de agentless sem evento recente">
             <div class="stat-label">Sem evento recente</div>
             <div class="stat-value" id="lecKpiNoEventDevices">0</div>
             <div class="stat-note">Dispositivos em atenção sem último evento registrado.</div>
@@ -611,6 +611,19 @@
           </div>
           <div id="detail-tags-list" class="tags-list"><span class="tags-empty">Carregando tags...</span></div>
         </div>
+      </div>
+    </div>
+
+    <div class="detail-modal" id="lecDetailModal" aria-hidden="true">
+      <div class="detail-box" role="dialog" aria-modal="true" aria-labelledby="lec-detail-title" style="max-width:860px">
+        <div class="detail-header">
+          <div>
+            <div class="card-title" id="lec-detail-title">Detalhes LEC</div>
+            <div class="card-subtitle">Informações específicas do Agentless (LEC).</div>
+          </div>
+          <button class="btn" id="closeLecDetailBtn" type="button">Fechar</button>
+        </div>
+        <div class="detail-grid" id="lec-detail-content"></div>
       </div>
     </div>
 

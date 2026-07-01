@@ -59,6 +59,7 @@ const DEFAULT_API_BASE = (() => {
     let contactPageSize = 10;
     let lecLogsList = [];
     let lecLogsFilteredList = [];
+    let activeAgentlessQuickFilter = null;
     let unifiedDashboardRows = [];
     let unifiedDashboardFilteredRows = [];
     let unifiedDashboardQuickFilter = 'all';
@@ -246,7 +247,7 @@ const DEFAULT_API_BASE = (() => {
     }
 
     function normalizeAgentlessConsultaRow(row) {
-      const tenantRawName = String(row.custom_name || row.customer_name || '').trim();
+      const tenantRawName = String(row.customer_name || row.custom_name || '').trim();
       const tenantName = normalizeTenantDisplay(tenantRawName || 'Tenant não informado');
       const hostname = row.hostname_lec || row.device_name || row.ip_host || row.ip_lec || '-';
       const ip = row.ip_host || row.ip_lec || '-';
@@ -276,13 +277,13 @@ const DEFAULT_API_BASE = (() => {
       if (consultaSource === 'agentless') {
         head.innerHTML = `
           <tr>
-            <th style="width:19%" data-sort-key="name" class="ci-sortable" aria-sort="none">Dispositivo <span class="ci-sort-indicator" aria-hidden="true"></span></th>
-            <th style="width:19%" data-sort-key="tenant" class="ci-sortable" aria-sort="none">Tenant <span class="ci-sort-indicator" aria-hidden="true"></span></th>
-            <th style="width:14%" data-sort-key="hostname" class="ci-sortable" aria-sort="none">Hostname <span class="ci-sort-indicator" aria-hidden="true"></span></th>
-            <th style="width:14%" data-sort-key="ipHost" class="ci-sortable" aria-sort="none">IP <span class="ci-sort-indicator" aria-hidden="true"></span></th>
-            <th style="width:12%" data-sort-key="status" class="ci-sortable" aria-sort="none">Status <span class="ci-sort-indicator" aria-hidden="true"></span></th>
+            <th style="width:18%" data-sort-key="name" class="ci-sortable" aria-sort="none">Dispositivo <span class="ci-sort-indicator" aria-hidden="true"></span></th>
+            <th style="width:18%" data-sort-key="tenant" class="ci-sortable" aria-sort="none">Tenant <span class="ci-sort-indicator" aria-hidden="true"></span></th>
+            <th style="width:13%" data-sort-key="hostname" class="ci-sortable" aria-sort="none">Hostname <span class="ci-sort-indicator" aria-hidden="true"></span></th>
+            <th style="width:13%" data-sort-key="ipHost" class="ci-sortable" aria-sort="none">IP <span class="ci-sort-indicator" aria-hidden="true"></span></th>
+            <th style="width:10%" data-sort-key="status" class="ci-sortable" aria-sort="none">Status <span class="ci-sort-indicator" aria-hidden="true"></span></th>
             <th style="width:14%" data-sort-key="lastEvent" class="ci-sortable" aria-sort="none">Último evento <span class="ci-sort-indicator" aria-hidden="true"></span></th>
-            <th style="width:8%">Origem</th>
+            <th style="width:14%">Acoes</th>
           </tr>
         `;
       } else {
@@ -413,20 +414,30 @@ const DEFAULT_API_BASE = (() => {
       showSection('consulta', { skipAutoLoad: true });
       await loadCIs({ resetPage: true });
 
-      if (source === 'agentless' && tenantFilter?.dataset.pendingTenantName) {
-        const normalizedTenant = normalizeTenantKey(tenantFilter.dataset.pendingTenantName);
-        const options = [...tenantFilter.options];
-        const matchedOption = options.find((option) => {
-          const byValue = normalizeTenantKey(option.value || option.textContent);
-          const byText = normalizeTenantKey(option.textContent);
-          return byValue === normalizedTenant || byText === normalizedTenant;
-        });
-        if (matchedOption) {
-          tenantFilter.value = matchedOption.value;
-          await loadCIs({ resetPage: true });
-        }
-        delete tenantFilter.dataset.pendingTenantName;
+      if (source === 'agentless') {
+        await applyPendingAgentlessTenantFilter();
       }
+    }
+
+    async function applyPendingAgentlessTenantFilter() {
+      const tenantFilter = document.getElementById('filterTenant');
+      const pendingTenantName = tenantFilter?.dataset.pendingTenantName;
+      if (!tenantFilter || !pendingTenantName) return;
+
+      const normalizedTenant = normalizeTenantKey(pendingTenantName);
+      const options = [...tenantFilter.options];
+      const matchedOption = options.find((option) => {
+        const byValue = normalizeTenantKey(option.value || option.textContent);
+        const byText = normalizeTenantKey(option.textContent);
+        return byValue === normalizedTenant || byText === normalizedTenant;
+      });
+
+      if (matchedOption) {
+        tenantFilter.value = matchedOption.value;
+        await loadCIs({ resetPage: true });
+      }
+
+      delete tenantFilter.dataset.pendingTenantName;
     }
 
     function sortAgentlessRows(rows) {
@@ -726,7 +737,7 @@ const DEFAULT_API_BASE = (() => {
         .map((row) => {
           const encodedTenantName = encodeURIComponent(String(row.tenantName || ''));
           return `
-        <article class="card dashboard-card tenant-kpi-card ${row.attention > 0 ? 'has-attention' : ''}">
+        <article class="card dashboard-card tenant-kpi-card ${row.attention > 0 ? 'has-attention' : ''}" data-consulta-source="agents" data-consulta-status="attention" data-tenant-name="${encodedTenantName}" data-consulta-card="true" role="button" tabindex="0" aria-label="Abrir consulta para ${esc(row.tenantName)} em atenção">
        
           <div class="tenant-kpi-header">
             <div class="tenant-kpi-name">${esc(row.tenantName)}</div>
@@ -1243,8 +1254,80 @@ const DEFAULT_API_BASE = (() => {
       toast(`Consulta aberta para ${normalizedTenantName}`);
     }
 
+    async function openConsultaFromCard(card) {
+      if (!card) return;
+
+      const source = card.dataset.consultaSource === 'agentless' ? 'agentless' : 'agents';
+      const status = String(card.dataset.consultaStatus || '').trim();
+      const lec = String(card.dataset.consultaLec || '').trim();
+      const tenantName = decodeURIComponent(String(card.dataset.tenantName || '').trim());
+      const agentlessFilter = String(card.dataset.consultaAgentlessFilter || '').trim();
+      const label = String(
+        card.dataset.consultaLabel
+        || card.querySelector('.stat-label, .tenant-kpi-name, .card-title')?.textContent
+        || 'Card'
+      ).trim();
+
+      setConsultaSource(source, { reload: false });
+      clearDashboardQuickFilter();
+
+      const searchInput = document.getElementById('searchQ');
+      if (searchInput) searchInput.value = '';
+
+      const statusFilter = document.getElementById('filterStatus');
+      const tenantFilter = document.getElementById('filterTenant');
+      const filterLec = document.getElementById('filterLec');
+      const filterCriticality = document.getElementById('filterCriticality');
+
+      if (statusFilter) statusFilter.value = status;
+      if (filterCriticality) filterCriticality.value = '';
+
+      if (source === 'agents') {
+        activeAgentlessQuickFilter = null;
+        if (filterLec) filterLec.value = lec;
+
+        if (tenantFilter) {
+          if (tenantName) {
+            const normalizedTenant = normalizeTenantKey(tenantName);
+            const matchedTenant = (catalogs.tenants || []).find((tenant) => {
+              const candidate = String(tenant?.name ?? tenant?.label ?? '').trim();
+              return normalizeTenantKey(candidate) === normalizedTenant;
+            });
+            tenantFilter.value = matchedTenant
+              ? String(matchedTenant.id ?? matchedTenant.value ?? matchedTenant.name)
+              : '';
+          } else {
+            tenantFilter.value = '';
+          }
+        }
+      } else {
+        if (filterLec) filterLec.value = '';
+
+        if (tenantFilter) {
+          if (tenantName) {
+            tenantFilter.dataset.pendingTenantName = tenantName;
+          } else {
+            tenantFilter.value = '';
+            delete tenantFilter.dataset.pendingTenantName;
+          }
+        }
+
+        activeAgentlessQuickFilter = agentlessFilter || null;
+      }
+
+      showSection('consulta', { skipAutoLoad: true });
+      await loadCIs({ resetPage: true });
+
+      if (source === 'agentless') {
+        await applyPendingAgentlessTenantFilter();
+      }
+
+      toast(`Consulta filtrada: ${label}`);
+    }
+
     function clearDashboardQuickFilter() {
       activeDashboardQuickFilter = null;
+      activeAgentlessQuickFilter = null;
     }
 
     function updateDashboardStatus(message, state = 'idle', blink = false) {
@@ -1543,7 +1626,7 @@ const DEFAULT_API_BASE = (() => {
         });
 
         const lecRows = lecRaw.map((row) => {
-          const tenantName = row.custom_name || row.customer_name || '-';
+          const tenantName = normalizeTenantDisplay(row.customer_name || row.custom_name || '-');
           const deviceName = row.hostname_lec || row.device_name || row.ip_host || row.ip_lec || '-';
           const ip = row.ip_host || row.ip_lec || '';
           return {
@@ -2534,7 +2617,7 @@ const DEFAULT_API_BASE = (() => {
 
       const groupedByTenant = new Map();
       lecLogsFilteredList.forEach((log) => {
-        const tenantRaw = String(log.custom_name || log.customer_name || '').trim();
+        const tenantRaw = String(log.customer_name || log.custom_name || '').trim();
         const tenantName = normalizeTenantDisplay(tenantRaw || 'Tenant não informado');
         const tenantKey = normalizeTenantKey(tenantName) || 'tenant-nao-informado';
         const deviceLabel = log.hostname_lec || log.device_name || log.ip_host || log.ip_lec || 'Dispositivo desconhecido';
@@ -2568,8 +2651,9 @@ const DEFAULT_API_BASE = (() => {
 
       container.innerHTML = tenantRows.map((row) => {
         const latestEventLabel = row.latestEventAt ? formatDate(row.latestEventAt) : 'Sem eventos';
+        const encodedTenantName = encodeURIComponent(String(row.tenantName || ''));
         return `
-          <article class="card dashboard-card tenant-kpi-card has-attention">
+          <article class="card dashboard-card tenant-kpi-card has-attention" data-consulta-source="agentless" data-consulta-status="attention" data-tenant-name="${encodedTenantName}" data-consulta-card="true" role="button" tabindex="0" aria-label="Abrir consulta agentless para ${esc(row.tenantName)} em atenção">
             <div class="tenant-kpi-header">
               <div class="tenant-kpi-name">${esc(row.tenantName)}</div>
               <div class="tenant-kpi-top-counts">
@@ -2665,7 +2749,7 @@ const DEFAULT_API_BASE = (() => {
       }
 
       if (consultaSource === 'agentless') {
-        tbody.innerHTML = sortedList.map((ci) => `
+        tbody.innerHTML = sortedList.map((ci, index) => `
           <tr>
             <td data-label="Dispositivo" title="${esc(ci.name)}" class="cell-primary">${esc(ci.name)}</td>
             <td data-label="Tenant" title="${esc(ci.tenantName || '-')}">${esc(ci.tenantName || '-')}</td>
@@ -2673,7 +2757,12 @@ const DEFAULT_API_BASE = (() => {
             <td data-label="IP" class="mono">${esc(ci.ip || '-')}</td>
             <td data-label="Status">${statusPill(ci.status)}</td>
             <td data-label="Último evento">${esc(ci.lastEvent ? formatDate(ci.lastEvent) : '-')}</td>
-            <td data-label="Origem">Agentless</td>
+            <td data-label="Acoes" class="cell-actions">
+              <div class="table-actions">
+                <button class="btn" type="button" data-action="view" data-index="${index}" aria-label="Ver detalhes do dispositivo ${esc(ci.name)}">Detalhes</button>
+                <button class="btn danger" type="button" data-action="delete" data-index="${index}" aria-label="Excluir dispositivo ${esc(ci.name)}">Excluir</button>
+              </div>
+            </td>
           </tr>
         `).join('');
         renderPagination(totalCIs, sortedList.length);
@@ -2857,6 +2946,10 @@ const DEFAULT_API_BASE = (() => {
           filtered = filtered.filter((row) => normalizeTenantKey(row.tenantName) === normalizedTenant);
         }
 
+        if (activeAgentlessQuickFilter === 'no_event') {
+          filtered = filtered.filter((row) => !row.lastEvent);
+        }
+
         const sorted = sortAgentlessRows(filtered);
         totalCIs = sorted.length;
         const totalPages = Math.max(1, Math.ceil(totalCIs / pageSize));
@@ -2888,6 +2981,50 @@ const DEFAULT_API_BASE = (() => {
       document.getElementById('detailModal').classList.add('show');
       document.getElementById('detailModal').setAttribute('aria-hidden', 'false');
       loadTagsForAsset(ci.id);
+    }
+
+    function renderLecDetailContent(ci) {
+      const raw = ci?.raw || {};
+      const fields = [
+        { label: 'Tenant', value: ci?.tenantName || '-' },
+        { label: 'Local do arquivo', value: raw.file_location || '-' },
+        { label: 'Ultimo evento', value: raw.last_event || '-' },
+        { label: 'Threshold (min)', value: raw.threshold_minutes ?? '-' },
+        { label: 'IP do host', value: raw.ip_host || '-' },
+        { label: 'Nome do dispositivo', value: raw.device_name || '-' },
+        { label: 'Hostname LEC', value: raw.hostname_lec || '-' },
+        { label: 'Status LEC', value: raw.status_lec || '-' },
+        { label: 'Criado em', value: raw.created_at || '-' },
+        { label: 'Atualizado em', value: raw.updated_at || '-' }
+      ];
+
+      const titleNode = document.getElementById('lec-detail-title');
+      const contentNode = document.getElementById('lec-detail-content');
+      if (titleNode) {
+        titleNode.textContent = ci?.name || 'Detalhes LEC';
+      }
+      if (!contentNode) return;
+
+      contentNode.innerHTML = fields.map(({ label, value }) => `
+        <div class="detail-field">
+          <span class="detail-key">${esc(label)}</span>
+          <span class="detail-val">${esc(value === null || value === undefined || value === '' ? '-' : String(value))}</span>
+        </div>`).join('');
+    }
+
+    function showLecDetail(ci) {
+      renderLecDetailContent(ci);
+      const modal = document.getElementById('lecDetailModal');
+      if (!modal) return;
+      modal.classList.add('show');
+      modal.setAttribute('aria-hidden', 'false');
+    }
+
+    function closeLecDetail() {
+      const modal = document.getElementById('lecDetailModal');
+      if (!modal) return;
+      modal.classList.remove('show');
+      modal.setAttribute('aria-hidden', 'true');
     }
 
     async function loadTagsForAsset(assetId) {
@@ -3284,10 +3421,40 @@ const DEFAULT_API_BASE = (() => {
       });
 
       document.getElementById('dashboardTenantsSection').addEventListener('click', (event) => {
-        const button = event.target.closest('button[data-action="verify-tenant"]');
-        if (!button) return;
-        const tenantName = decodeURIComponent(button.dataset.tenantName || '');
-        openConsultaForTenant(tenantName);
+        const card = event.target.closest('[data-consulta-card="true"]');
+        if (!card) return;
+        openConsultaFromCard(card);
+      });
+      document.getElementById('dashboardTenantsSection').addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        const card = event.target.closest('[data-consulta-card="true"]');
+        if (!card) return;
+        event.preventDefault();
+        openConsultaFromCard(card);
+      });
+
+      document.getElementById('lec-logs-container').addEventListener('click', (event) => {
+        const card = event.target.closest('[data-consulta-card="true"]');
+        if (!card) return;
+        openConsultaFromCard(card);
+      });
+      document.getElementById('lec-logs-container').addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        const card = event.target.closest('[data-consulta-card="true"]');
+        if (!card) return;
+        event.preventDefault();
+        openConsultaFromCard(card);
+      });
+
+      document.querySelectorAll('[data-consulta-card="true"]').forEach((card) => {
+        card.addEventListener('click', () => {
+          openConsultaFromCard(card);
+        });
+        card.addEventListener('keydown', (event) => {
+          if (event.key !== 'Enter' && event.key !== ' ') return;
+          event.preventDefault();
+          openConsultaFromCard(card);
+        });
       });
 
       REQUIRED_ASSET_FIELDS.forEach((id) => {
@@ -3324,17 +3491,24 @@ const DEFAULT_API_BASE = (() => {
       });
 
       document.getElementById('ci-table').addEventListener('click', (event) => {
-        if (consultaSource !== 'agents') return;
         const button = event.target.closest('button[data-action]');
         if (!button) return;
         const ci = visibleCIs[Number(button.dataset.index)];
         if (!ci) return;
 
         if (button.dataset.action === 'view') {
-          showDetail(ci);
+          if (consultaSource === 'agentless') {
+            showLecDetail(ci);
+          } else {
+            showDetail(ci);
+          }
           return;
         }
         if (button.dataset.action === 'delete') {
+          if (consultaSource === 'agentless') {
+            toast('Exclusão não disponível para Agentless.', 'error');
+            return;
+          }
           deleteCI(ci.id);
         }
       });
@@ -3366,6 +3540,17 @@ const DEFAULT_API_BASE = (() => {
       document.getElementById('detailModal').addEventListener('click', (event) => {
         if (event.target.id === 'detailModal') closeDetail();
       });
+
+      const closeLecDetailBtn = document.getElementById('closeLecDetailBtn');
+      if (closeLecDetailBtn) {
+        closeLecDetailBtn.addEventListener('click', closeLecDetail);
+      }
+      const lecDetailModal = document.getElementById('lecDetailModal');
+      if (lecDetailModal) {
+        lecDetailModal.addEventListener('click', (event) => {
+          if (event.target.id === 'lecDetailModal') closeLecDetail();
+        });
+      }
 
       document.getElementById('closeConfirmModalBtn').addEventListener('click', () => closeConfirmDialog(false));
       document.getElementById('cancelConfirmModalBtn').addEventListener('click', () => closeConfirmDialog(false));
@@ -3464,6 +3649,7 @@ const DEFAULT_API_BASE = (() => {
       document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape') {
           closeDetail();
+          closeLecDetail();
           closeTenantModal();
           closeConfirmDialog(false);
           closeConsultaSourceModal();
